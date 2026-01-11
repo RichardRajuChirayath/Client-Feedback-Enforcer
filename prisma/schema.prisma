@@ -1,0 +1,127 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// User model for authentication
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  projects      Project[]
+  sessions      Session[]
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// Project model - represents a client project
+model Project {
+  id          String    @id @default(cuid())
+  name        String
+  clientName  String?
+  description String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  revisions   Revision[]
+}
+
+// Revision model - represents a round of feedback/revision
+model Revision {
+  id              String    @id @default(cuid())
+  revisionNumber  Int       @default(1)
+  status          RevisionStatus @default(IN_PROGRESS)
+  rawFeedback     String?   @db.Text  // Original client feedback (raw paste)
+  revisionSummary String?   @db.Text  // Designer's revision summary
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  projectId       String
+  project         Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  
+  feedbackItems   FeedbackItem[]
+  complianceReport ComplianceReport?
+}
+
+enum RevisionStatus {
+  IN_PROGRESS
+  PENDING_REVIEW
+  COMPLETED
+  NEEDS_CLARIFICATION
+}
+
+// FeedbackItem model - individual structured feedback items
+model FeedbackItem {
+  id            String    @id @default(cuid())
+  feedbackId    String    // Auto-generated ID like "FB-001"
+  content       String    @db.Text  // The actual feedback text
+  category      FeedbackCategory
+  priority      Priority  @default(MEDIUM)
+  requiredAction String?   @db.Text
+  status        FeedbackStatus @default(PENDING)
+  aiNotes       String?   @db.Text  // AI-generated notes/suggestions
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  revisionId    String
+  revision      Revision  @relation(fields: [revisionId], references: [id], onDelete: Cascade)
+  
+  @@index([revisionId])
+  @@index([status])
+}
+
+enum FeedbackCategory {
+  DESIGN
+  COPY
+  UX
+  TECHNICAL
+  GENERAL
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum FeedbackStatus {
+  PENDING
+  ADDRESSED
+  MISSED
+  NEEDS_CLARIFICATION
+  PARTIALLY_ADDRESSED
+}
+
+// ComplianceReport model - the magic output
+model ComplianceReport {
+  id                  String    @id @default(cuid())
+  addressedCount      Int       @default(0)
+  missedCount         Int       @default(0)
+  clarificationCount  Int       @default(0)
+  overallScore        Float?    // Compliance percentage
+  summary             String?   @db.Text
+  recommendations     String?   @db.Text
+  createdAt           DateTime  @default(now())
+  
+  revisionId          String    @unique
+  revision            Revision  @relation(fields: [revisionId], references: [id], onDelete: Cascade)
+}
