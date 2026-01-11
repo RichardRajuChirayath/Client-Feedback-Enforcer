@@ -140,7 +140,7 @@ The system compares feedback list against revision summary.
    npm run dev
    ```
 
-6. **Open [http://localhost:3000](http://localhost:3000)** 🎉
+
 
 ---
 
