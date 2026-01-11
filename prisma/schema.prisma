@@ -1,6 +1,5 @@
 generator client {
   provider = "prisma-client-js"
-  output   = "../src/generated/prisma"
 }
 
 datasource db {
@@ -124,4 +123,16 @@ model ComplianceReport {
   
   revisionId          String    @unique
   revision            Revision  @relation(fields: [revisionId], references: [id], onDelete: Cascade)
+}
+
+// Magic Link Token for passwordless authentication
+model MagicToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  email     String
+  expires   DateTime
+  createdAt DateTime @default(now())
+  
+  @@index([token])
+  @@index([email])
 }
