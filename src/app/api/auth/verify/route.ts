@@ -19,23 +19,29 @@ export async function GET(request: NextRequest) {
         }
 
         // Find or create user
-        let user = await prisma.user.findUnique({
-            where: { email },
-        });
+        let users = await prisma.$queryRaw<any[]>`SELECT * FROM "User" WHERE email = ${email} LIMIT 1`;
+        let user: any = users[0];
 
         if (!user) {
-            user = await prisma.user.create({
-                data: {
-                    email,
-                    name: email.split("@")[0], // Default name from email
-                },
-            });
+            const id = crypto.randomUUID();
+            const name = email.split("@")[0];
+
+            // Create new user (default to AGENCY role implicitly by DB default if column exists, or just ignore role)
+            // We use raw SQL to avoid type issues with the stale client
+            await prisma.$executeRaw`
+                INSERT INTO "User" (id, email, name, "createdAt", "updatedAt")
+                VALUES (${id}, ${email}, ${name}, NOW(), NOW())
+            `;
+
+            // Re-fetch
+            users = await prisma.$queryRaw<any[]>`SELECT * FROM "User" WHERE id = ${id}`;
+            user = users[0];
         }
 
         // Create session
         await createSession(user.id);
 
-        // Redirect to dashboard
+        // Redirect to dashboard (Standard logic)
         return NextResponse.redirect(new URL("/dashboard", request.url));
     } catch (error) {
         console.error("Verify magic link error:", error);

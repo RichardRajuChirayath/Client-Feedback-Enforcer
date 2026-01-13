@@ -7,6 +7,8 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+
+
 // User model for authentication
 model User {
   id            String    @id @default(cuid())
@@ -19,6 +21,8 @@ model User {
   projects      Project[]
   sessions      Session[]
 }
+
+
 
 model Session {
   id           String   @id @default(cuid())
@@ -77,6 +81,7 @@ model FeedbackItem {
   requiredAction String?   @db.Text
   status        FeedbackStatus @default(PENDING)
   aiNotes       String?   @db.Text  // AI-generated notes/suggestions
+  completedAt   DateTime? // Track when the item was marked as addressed
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   

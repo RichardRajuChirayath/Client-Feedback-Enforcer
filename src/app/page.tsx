@@ -15,11 +15,11 @@ export default function LoginPage() {
   useEffect(() => {
     const errorParam = searchParams.get("error");
     if (errorParam === "invalid_token") {
-      setError("This magic link has expired or is invalid. Please request a new one.");
+      setError("Link expired. Please request a new one.");
     } else if (errorParam === "missing_token") {
-      setError("Invalid link. Please request a new magic link.");
+      setError("Invalid link.");
     } else if (errorParam === "verification_failed") {
-      setError("Verification failed. Please try again.");
+      setError("Verification failed.");
     }
   }, [searchParams]);
 
@@ -68,137 +68,149 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="relative min-h-screen w-full overflow-hidden bg-[#030712] flex items-center justify-center p-6">
-      {/* Animated Gradient Background */}
-      <div className="absolute inset-0 bg-gradient-radial from-indigo-950/40 via-purple-950/30 to-black animate-slow-pulse" />
+    <div className="min-h-screen w-full bg-[#02040a] flex flex-col lg:flex-row">
+      {/* LEFT SIDE: Branding & Visuals (Hidden on mobile, visible on lg screens) */}
+      <div className="hidden lg:flex w-1/2 relative bg-indigo-950/20 items-center justify-center overflow-hidden">
+        {/* Background Effects */}
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-indigo-900/40 via-[#02040a] to-[#02040a]" />
+        <div className="absolute top-[-20%] left-[-20%] w-[800px] h-[800px] bg-indigo-600/20 rounded-full blur-[120px] animate-pulse" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[600px] h-[600px] bg-purple-600/10 rounded-full blur-[100px] animate-pulse" style={{ animationDelay: '2s' }} />
 
-      {/* Floating glowing orbs */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-[-20%] left-[-10%] w-96 h-96 bg-gradient-to-br from-blue-600/20 to-purple-600/10 rounded-full blur-3xl animate-float-slow" />
-        <div className="absolute bottom-[-15%] right-[-15%] w-[500px] h-[500px] bg-gradient-to-tl from-purple-700/20 to-pink-600/10 rounded-full blur-3xl animate-float-slow-delayed" />
-        <div className="absolute top-1/3 left-1/4 w-64 h-64 bg-cyan-500/10 rounded-full blur-2xl animate-float-fast" />
-      </div>
-
-      {/* Subtle animated particles (optional – can be removed for performance) */}
-      <div className="absolute inset-0 bg-[radial-gradient(#ffffff10_1px,transparent_1px)] bg-[length:30px_30px] opacity-30 animate-drift" />
-
-      {/* Main Content */}
-      <div className="relative z-10 w-full max-w-lg">
-        {/* Logo + Title with sparkle */}
-        <div className="flex flex-col items-center text-center mb-16">
-          <div className="relative group">
-            <div className="absolute inset-0 bg-gradient-to-r from-primary to-purple-600 rounded-[32px] blur-xl opacity-60 group-hover:opacity-80 transition-opacity duration-700" />
-            <div className="relative w-24 h-24 rounded-[32px] bg-gradient-to-br from-blue-600 to-purple-700 flex items-center justify-center shadow-2xl transform transition-all duration-500 group-hover:scale-110 group-hover:rotate-3">
-              <CheckCircle className="w-14 h-14 text-white" />
-              <Sparkles className="absolute -top-2 -right-2 w-8 h-8 text-yellow-300/70 animate-pulse" />
+        {/* Branding Content */}
+        <div className="relative z-10 flex flex-col items-center text-center px-12">
+          <div className="mb-12 relative group cursor-default">
+            <div className="absolute inset-0 bg-indigo-500/30 rounded-3xl blur-2xl group-hover:bg-indigo-500/50 transition-all duration-700" />
+            <div className="relative w-32 h-32 rounded-3xl bg-gradient-to-br from-indigo-600 to-purple-700 flex items-center justify-center shadow-2xl border border-white/10 transform transition-transform duration-500 group-hover:scale-105 group-hover:rotate-3">
+              <CheckCircle className="w-16 h-16 text-white" />
+              <Sparkles className="absolute -top-3 -right-3 w-8 h-8 text-yellow-300 animate-pulse" />
             </div>
           </div>
 
-          <h1 className="mt-10 text-5xl sm:text-6xl font-black tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white via-purple-200 to-indigo-300 leading-none">
+          <h1 className="text-6xl font-black tracking-tighter text-white mb-6 leading-tight">
             Feedback
-            <br />
-            <span className="bg-gradient-to-r from-cyan-400 via-purple-500 to-pink-500 bg-clip-text text-transparent">Enforcer</span>
+            <span className="block text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400">
+              Enforcer
+            </span>
           </h1>
 
-          <p className="mt-5 text-lg text-slate-400 font-medium tracking-wide">
-            Never miss a single client insight again
+          <p className="text-lg text-slate-400 max-w-md font-medium leading-relaxed">
+            Streamline your design agency's feedback loop.
+            <br />
+            <span className="text-slate-500 mt-2 block text-sm uppercase tracking-widest">Never miss a client insight</span>
           </p>
         </div>
+      </div>
 
-        {/* Glass Card – deeper glassmorphism */}
-        <div className="glass-panel relative overflow-hidden rounded-3xl border border-white/10 bg-white/5 backdrop-blur-2xl shadow-[0_30px_80px_-20px_rgba(0,0,0,0.7)] p-10 sm:p-12 transition-all duration-500 hover:shadow-[0_40px_100px_-20px_rgba(99,102,241,0.4)]">
-          {!isSent ? (
-            <div className="space-y-10">
-              <div className="text-center">
-                <h2 className="text-3xl font-extrabold text-white tracking-tight">Welcome back, enforcer</h2>
-                <p className="mt-3 text-slate-400">Sign in with magic link – no passwords needed</p>
-              </div>
+      {/* RIGHT SIDE: Login Form */}
+      <div className="w-full lg:w-1/2 flex flex-col items-center justify-center p-8 relative bg-[#0B0F19]">
+        {/* Subtle Background for Right Side */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute top-1/4 right-0 w-[500px] h-[500px] bg-indigo-500/5 rounded-full blur-[100px]" />
+          <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-purple-500/5 rounded-full blur-[100px]" />
+        </div>
 
-              {error && (
-                <div className="flex items-center gap-3 p-5 rounded-2xl bg-red-900/30 border border-red-500/30 text-red-300 animate-shake">
-                  <AlertCircle className="w-6 h-6 shrink-0" />
-                  <p className="text-sm font-medium">{error}</p>
-                </div>
-              )}
+        <div className="w-full max-w-[440px] relative z-10">
+          {/* Mobile Logo */}
+          <div className="lg:hidden flex flex-col items-center mb-10">
+            <div className="w-14 h-14 bg-gradient-to-br from-indigo-600 to-purple-700 rounded-2xl flex items-center justify-center mb-4 shadow-lg shadow-indigo-900/20">
+              <CheckCircle className="w-7 h-7 text-white" />
+            </div>
+            <h2 className="text-2xl font-black text-white tracking-tight">Feedback Enforcer</h2>
+          </div>
 
-              <form onSubmit={handleSubmit} className="space-y-8">
-                <div className="space-y-3">
-                  <label className="block text-sm font-semibold text-slate-300 tracking-wide ml-1">
-                    YOUR EMAIL
-                  </label>
-                  <div className="relative">
-                    <Mail className="absolute left-5 top-1/2 -translate-y-1/2 w-6 h-6 text-slate-500 transition-colors group-focus-within:text-cyan-400" />
-                    <input
-                      type="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value.trim())}
-                      required
-                      placeholder="name@company.com"
-                      className="w-full bg-black/40 border border-white/10 rounded-2xl pl-20 pr-6 py-5 text-white placeholder:text-slate-600 focus:border-cyan-500/50 focus:ring-4 focus:ring-cyan-500/20 outline-none transition-all duration-300 text-lg"
-                    />
+          <div className="glass-panel p-8 lg:p-14 rounded-[40px] border border-white/5 shadow-2xl backdrop-blur-xl flex flex-col gap-8 lg:gap-10 w-full max-w-lg mx-auto relative z-20">
+            <div className={!isSent ? "" : "text-center"}>
+              <h2 className="text-4xl lg:text-5xl font-black text-white tracking-tighter mb-4">
+                {!isSent ? (
+                  <>
+                    Welcome <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400">back</span>
+                  </>
+                ) : (
+                  "Check your inbox"
+                )}
+              </h2>
+              <p className="text-slate-300 text-lg lg:text-xl font-medium leading-relaxed max-w-sm">
+                {!isSent ? "Enter your email to access your dashboard." : `We've sent a magic link to ${email}`}
+              </p>
+            </div>
+
+            {!isSent ? (
+              <>
+                {error && (
+                  <div className="p-5 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-400 text-base font-semibold flex items-start gap-3 animate-shake">
+                    <AlertCircle className="w-6 h-6 shrink-0 mt-0.5" />
+                    <span className="leading-snug">{error}</span>
                   </div>
-                </div>
+                )}
 
-                <button
-                  type="submit"
-                  disabled={isLoading || !email.trim()}
-                  className="group relative w-full overflow-hidden rounded-2xl bg-gradient-to-r from-cyan-600 via-purple-600 to-indigo-600 p-[3px] focus:outline-none disabled:opacity-50"
-                >
-                  <div className="relative flex h-16 items-center justify-center gap-3 rounded-2xl bg-black/70 px-8 text-lg font-bold text-white transition-all duration-500 group-hover:bg-black/40 group-active:scale-98">
+                <form onSubmit={handleSubmit} className="flex flex-col gap-8 w-full">
+                  <div className="space-y-3 w-full">
+                    <label className="text-xs font-black text-indigo-300 uppercase tracking-[0.2em] ml-2">Email Address</label>
+                    <div className="relative group w-full">
+                      <div className="absolute left-6 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400 z-10 transition-colors group-focus-within:text-indigo-400">
+                        <Mail className="w-7 h-7" />
+                      </div>
+                      <input
+                        type="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value.trim())}
+                        required
+                        placeholder="name@company.com"
+                        style={{ paddingLeft: '4.5rem' }}
+                        className="w-full h-20 bg-slate-900/50 border border-white/10 rounded-2xl !pl-[4.5rem] pr-6 text-white placeholder:text-slate-600 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/20 outline-none transition-all font-bold text-xl appearance-none hover:bg-slate-900/70"
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={isLoading || !email.trim()}
+                    className="premium-button w-full h-20 rounded-2xl text-white font-black text-xl tracking-wide shadow-2xl shadow-indigo-600/30 hover:shadow-indigo-600/50 hover:-translate-y-1 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-4 group mt-2 shrink-0"
+                  >
                     {isLoading ? (
                       <>
                         <Loader2 className="w-7 h-7 animate-spin" />
-                        <span>Sending Magic Link...</span>
+                        <span>Sending Link...</span>
                       </>
                     ) : (
                       <>
-                        <span>Send Magic Link</span>
-                        <Mail className="w-6 h-6 opacity-80 group-hover:opacity-100 transition-opacity" />
+                        <span>Sign in with Magic Link</span>
+                        <Mail className="w-6 h-6 opacity-80 group-hover:translate-x-1.5 transition-transform" />
                       </>
                     )}
-                  </div>
-                </button>
-              </form>
+                  </button>
+                </form>
 
-              {/* Security trust badge */}
-              <div className="flex justify-center pt-6">
-                <div className="inline-flex items-center gap-3 px-6 py-3 rounded-full bg-white/5 border border-white/10 backdrop-blur-sm">
-                  <Shield className="w-5 h-5 text-cyan-400" />
-                  <span className="text-xs font-bold uppercase tracking-widest text-slate-400">
-                    Secure • Passwordless • Magic Link
-                  </span>
+                <div className="flex justify-center w-full pt-4">
+                  <div className="flex items-center gap-2.5 text-xs font-extrabold tracking-[0.25em] text-slate-500 uppercase bg-white/5 px-6 py-3 rounded-full hover:bg-white/10 transition-colors cursor-default">
+                    <Shield className="w-4 h-4 text-emerald-500" />
+                    Secure Passwordless Login
+                  </div>
                 </div>
+              </>
+            ) : (
+              <div className="flex flex-col items-center gap-10 w-full py-4">
+                <div className="w-28 h-28 bg-emerald-500/10 rounded-3xl flex items-center justify-center border-2 border-emerald-500/20 animate-pulse-slow shadow-xl shadow-emerald-500/10">
+                  <Mail className="w-12 h-12 text-emerald-500" />
+                </div>
+                <button
+                  onClick={() => { setIsSent(false); setEmail(''); }}
+                  className="text-indigo-400 hover:text-indigo-300 font-bold text-lg flex items-center gap-2 transition-colors hover:underline underline-offset-4"
+                >
+                  Use a different email
+                </button>
               </div>
-            </div>
-          ) : (
-            <div className="text-center space-y-8 py-10">
-              <div className="inline-flex items-center justify-center w-24 h-24 rounded-full bg-emerald-500/10 border-2 border-emerald-500/30 animate-pulse-slow">
-                <Mail className="w-12 h-12 text-emerald-400" />
-              </div>
-              <div>
-                <h2 className="text-3xl font-bold text-white">Magic link sent!</h2>
-                <p className="mt-4 text-slate-300 text-lg">
-                  Check <span className="font-bold text-white">{email}</span>
-                  <br />
-                  <span className="text-sm text-slate-500 mt-2 block">The link expires in 15 minutes</span>
-                </p>
-              </div>
-              <button
-                onClick={() => {
-                  setIsSent(false);
-                  setEmail("");
-                }}
-                className="text-cyan-400 hover:text-cyan-300 font-semibold transition-colors"
-              >
-                Try a different email →
-              </button>
-            </div>
-          )}
+            )}
+          </div>
         </div>
 
-        <p className="mt-12 text-center text-xs text-slate-600 font-bold tracking-widest opacity-50 uppercase">
-          © 2026 Feedback Enforcer — All rights reserved
-        </p>
+        <div className="mt-12 text-center lg:hidden">
+          <span className="text-[10px] font-bold text-slate-700 tracking-widest uppercase">© 2026 Feedback Enforcer</span>
+        </div>
+      </div>
+
+      <div className="hidden lg:block absolute bottom-10 left-10">
+        <span className="text-[10px] font-bold text-slate-700 tracking-widest uppercase opacity-60">© 2026 Feedback Enforcer Inc.</span>
       </div>
     </div>
   );

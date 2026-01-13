@@ -1,8 +1,28 @@
 import { NextRequest, NextResponse } from "next/server";
 import { generateMagicToken, sendMagicLinkEmail } from "@/lib/magic-link";
+import { checkRateLimit, getRateLimitKey } from "@/lib/rate-limiter";
 
 export async function POST(request: NextRequest) {
     try {
+        // Get client IP for rate limiting
+        const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
+            || request.headers.get("x-real-ip")
+            || "unknown";
+
+        // Check IP-based rate limit first
+        const ipKey = getRateLimitKey("ip", ip);
+        const ipRateLimit = checkRateLimit(ipKey);
+
+        if (!ipRateLimit.allowed) {
+            return NextResponse.json(
+                {
+                    error: "Too many requests. Please try again later.",
+                    retryAfter: ipRateLimit.remainingTime
+                },
+                { status: 429 }
+            );
+        }
+
         const { email } = await request.json();
 
         if (!email || typeof email !== "string") {
@@ -18,6 +38,20 @@ export async function POST(request: NextRequest) {
             return NextResponse.json(
                 { error: "Invalid email format" },
                 { status: 400 }
+            );
+        }
+
+        // Check email-based rate limit
+        const emailKey = getRateLimitKey("email", email);
+        const emailRateLimit = checkRateLimit(emailKey);
+
+        if (!emailRateLimit.allowed) {
+            return NextResponse.json(
+                {
+                    error: "Too many login attempts for this email. Please try again later.",
+                    retryAfter: emailRateLimit.remainingTime
+                },
+                { status: 429 }
             );
         }
 

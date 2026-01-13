@@ -4,65 +4,75 @@ import { prisma } from "./prisma";
 const TOKEN_EXPIRY_MINUTES = 15;
 
 export async function generateMagicToken(email: string): Promise<string> {
-    // Delete any existing tokens for this email
-    await prisma.magicToken.deleteMany({ where: { email } });
+  // Use raw SQL to bypass potential Prisma Client generation issues
+  await prisma.$executeRaw`DELETE FROM "MagicToken" WHERE email = ${email}`;
 
-    // Generate a new token
-    const token = randomBytes(32).toString("hex");
-    const expires = new Date(Date.now() + TOKEN_EXPIRY_MINUTES * 60 * 1000);
+  const token = randomBytes(32).toString("hex");
+  // Calculate expiry (15 mins from now)
+  const expires = new Date(Date.now() + TOKEN_EXPIRY_MINUTES * 60 * 1000);
+  const id = randomBytes(16).toString("hex");
 
-    await prisma.magicToken.create({
-        data: {
-            token,
-            email,
-            expires,
-        },
-    });
+  // Insert using raw SQL (no role)
+  await prisma.$executeRaw`
+    INSERT INTO "MagicToken" (id, token, email, expires, "createdAt")
+    VALUES (${id}, ${token}, ${email}, ${expires}, NOW())
+  `;
 
-    return token;
+  return token;
 }
 
 export async function verifyMagicToken(token: string): Promise<string | null> {
-    const magicToken = await prisma.magicToken.findUnique({
-        where: { token },
-    });
+  // Fetch using raw SQL
+  const tokens = await prisma.$queryRaw<any[]>`
+    SELECT * FROM "MagicToken" WHERE token = ${token} LIMIT 1
+  `;
 
-    if (!magicToken) {
-        return null;
-    }
+  const magicToken = tokens[0];
 
-    // Check if expired
-    if (magicToken.expires < new Date()) {
-        await prisma.magicToken.delete({ where: { id: magicToken.id } });
-        return null;
-    }
+  if (!magicToken) {
+    return null;
+  }
 
-    // Delete the token (one-time use)
-    await prisma.magicToken.delete({ where: { id: magicToken.id } });
+  // Check if expired
+  if (new Date(magicToken.expires) < new Date()) {
+    await prisma.$executeRaw`DELETE FROM "MagicToken" WHERE id = ${magicToken.id}`;
+    return null;
+  }
 
-    return magicToken.email;
+  // Delete the token (one-time use)
+  await prisma.$executeRaw`DELETE FROM "MagicToken" WHERE id = ${magicToken.id}`;
+
+  return magicToken.email;
 }
 
 export async function sendMagicLinkEmail(email: string, token: string): Promise<boolean> {
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-    const magicLink = `${appUrl}/api/auth/verify?token=${token}`;
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  const magicLink = `${appUrl}/api/auth/verify?token=${token}`;
 
-    try {
-        const response = await fetch("https://api.brevo.com/v3/smtp/email", {
-            method: "POST",
-            headers: {
-                "accept": "application/json",
-                "api-key": process.env.BREVO_API_KEY || "",
-                "content-type": "application/json",
-            },
-            body: JSON.stringify({
-                sender: {
-                    name: "Client Feedback Enforcer",
-                    email: "noreply@feedbackenforcer.app",
-                },
-                to: [{ email }],
-                subject: "🔐 Your Magic Link to Sign In",
-                htmlContent: `
+  const apiKey = process.env.BREVO_API_KEY || "";
+  if (!apiKey) {
+    console.error("❌ BREVO_API_KEY is missing from environment variables");
+    return false;
+  }
+
+  console.log(`📡 Attempting to send email to ${email} (API Key: ${apiKey.substring(0, 8)}...)`);
+
+  try {
+    const response = await fetch("https://api.brevo.com/v3/smtp/email", {
+      method: "POST",
+      headers: {
+        "accept": "application/json",
+        "api-key": apiKey,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        sender: {
+          name: process.env.BREVO_SENDER_NAME || "Client Feedback Enforcer",
+          email: process.env.BREVO_SENDER_EMAIL || "noreply@feedbackenforcer.app",
+        },
+        to: [{ email }],
+        subject: "🔐 Your Magic Link to Sign In",
+        htmlContent: `
           <!DOCTYPE html>
           <html>
           <head>
@@ -77,7 +87,7 @@ export async function sendMagicLinkEmail(email: string, token: string): Promise<
                     <tr>
                       <td align="center" style="padding-bottom: 32px;">
                         <div style="width: 64px; height: 64px; background: linear-gradient(135deg, #6366f1, #a855f7); border-radius: 16px; display: inline-flex; align-items: center; justify-content: center;">
-                          <span style="font-size: 32px;">✓</span>
+                          <span style="font-size: 32px; color: white;">✓</span>
                         </div>
                       </td>
                     </tr>
@@ -108,12 +118,23 @@ export async function sendMagicLinkEmail(email: string, token: string): Promise<
           </body>
           </html>
         `,
-            }),
-        });
+      }),
+    });
 
-        return response.ok;
-    } catch (error) {
-        console.error("Failed to send magic link email:", error);
-        return false;
+    if (!response.ok) {
+      const errorText = await response.text(); // Get raw text first
+      console.error("❌ Brevo API Error:", {
+        status: response.status,
+        statusText: response.statusText,
+        body: errorText
+      });
+      return false;
     }
+
+    console.log("✅ Email sent successfully via Brevo");
+    return true;
+  } catch (error) {
+    console.error("Failed to send magic link email:", error);
+    return false;
+  }
 }
