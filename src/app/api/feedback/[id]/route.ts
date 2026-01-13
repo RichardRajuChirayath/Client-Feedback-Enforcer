@@ -12,9 +12,10 @@ enum FeedbackStatus {
 
 export async function PATCH(
     request: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
+        const { id } = await params;
         const session = await getSession();
         if (!session?.user) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -29,7 +30,7 @@ export async function PATCH(
 
         // Verify ownership through the chain: FeedbackItem -> Revision -> Project -> User
         const feedbackItem = await prisma.feedbackItem.findUnique({
-            where: { id: params.id },
+            where: { id: id },
             include: {
                 revision: {
                     include: {
@@ -44,7 +45,7 @@ export async function PATCH(
         }
 
         const updatedItem = await prisma.feedbackItem.update({
-            where: { id: params.id },
+            where: { id: id },
             data: {
                 status,
                 completedAt: status === "ADDRESSED" ? new Date() : null
