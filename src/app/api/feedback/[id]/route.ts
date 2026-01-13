@@ -10,6 +10,7 @@ enum FeedbackStatus {
     PARTIALLY_ADDRESSED = "PARTIALLY_ADDRESSED"
 }
 
+// Next.js 15/16 requires params to be a Promise
 export async function PATCH(
     request: NextRequest,
     { params }: { params: Promise<{ id: string }> }
