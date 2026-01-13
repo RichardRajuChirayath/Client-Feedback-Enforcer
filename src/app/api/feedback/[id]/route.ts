@@ -50,7 +50,7 @@ export async function PATCH(
             data: {
                 status,
                 completedAt: status === "ADDRESSED" ? new Date() : null
-            }
+            } as any
         });
 
         // Simply return the updated item. The frontend can recalculate compliance locally or refresh.
