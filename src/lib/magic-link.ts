@@ -46,7 +46,7 @@ export async function verifyMagicToken(token: string): Promise<string | null> {
 }
 
 export async function sendMagicLinkEmail(email: string, token: string): Promise<boolean> {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  const appUrl = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
   const magicLink = `${appUrl}/api/auth/verify?token=${token}`;
 
   const apiKey = process.env.BREVO_API_KEY || "";

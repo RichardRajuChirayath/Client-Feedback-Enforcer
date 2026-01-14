@@ -7,28 +7,17 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-
-
-// User model for authentication
 model User {
-  id            String    @id @default(cuid())
-  email         String    @unique
-  name          String?
-  image         String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  
-  projects      Project[]
-  sessions      Session[]
-  role          Role      @default(AGENCY)
+  id        String    @id @default(cuid())
+  email     String    @unique
+  name      String?
+  image     String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  role      Role      @default(AGENCY)
+  projects  Project[]
+  sessions  Session[]
 }
-
-enum Role {
-  AGENCY
-  CLIENT
-}
-
-
 
 model Session {
   id           String   @id @default(cuid())
@@ -38,36 +27,79 @@ model Session {
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
-// Project model - represents a client project
 model Project {
-  id          String    @id @default(cuid())
+  id          String     @id @default(cuid())
   name        String
   clientName  String?
   description String?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
   userId      String
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   revisions   Revision[]
 }
 
-// Revision model - represents a round of feedback/revision
 model Revision {
-  id              String    @id @default(cuid())
-  revisionNumber  Int       @default(1)
-  status          RevisionStatus @default(IN_PROGRESS)
-  rawFeedback     String?   @db.Text  // Original client feedback (raw paste)
-  revisionSummary String?   @db.Text  // Designer's revision summary
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-  
-  projectId       String
-  project         Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  
-  feedbackItems   FeedbackItem[]
+  id               String            @id @default(cuid())
+  revisionNumber   Int               @default(1)
+  status           RevisionStatus    @default(IN_PROGRESS)
+  rawFeedback      String?
+  revisionSummary  String?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  projectId        String
   complianceReport ComplianceReport?
+  feedbackItems    FeedbackItem[]
+  project          Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+model FeedbackItem {
+  id             String           @id @default(cuid())
+  feedbackId     String
+  content        String
+  category       FeedbackCategory
+  priority       Priority         @default(MEDIUM)
+  requiredAction String?
+  status         FeedbackStatus   @default(PENDING)
+  aiNotes        String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  revisionId     String
+  completedAt    DateTime?
+  revision       Revision         @relation(fields: [revisionId], references: [id], onDelete: Cascade)
+
+  @@index([revisionId])
+  @@index([status])
+}
+
+model ComplianceReport {
+  id                 String   @id @default(cuid())
+  addressedCount     Int      @default(0)
+  missedCount        Int      @default(0)
+  clarificationCount Int      @default(0)
+  overallScore       Float?
+  summary            String?
+  recommendations    String?
+  createdAt          DateTime @default(now())
+  revisionId         String   @unique
+  revision           Revision @relation(fields: [revisionId], references: [id], onDelete: Cascade)
+}
+
+model MagicToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  email     String
+  expires   DateTime
+  createdAt DateTime @default(now())
+  role      String?
+
+  @@index([token])
+  @@index([email])
+}
+
+enum Role {
+  AGENCY
+  CLIENT
 }
 
 enum RevisionStatus {
@@ -75,27 +107,6 @@ enum RevisionStatus {
   PENDING_REVIEW
   COMPLETED
   NEEDS_CLARIFICATION
-}
-
-// FeedbackItem model - individual structured feedback items
-model FeedbackItem {
-  id            String    @id @default(cuid())
-  feedbackId    String    // Auto-generated ID like "FB-001"
-  content       String    @db.Text  // The actual feedback text
-  category      FeedbackCategory
-  priority      Priority  @default(MEDIUM)
-  requiredAction String?   @db.Text
-  status        FeedbackStatus @default(PENDING)
-  aiNotes       String?   @db.Text  // AI-generated notes/suggestions
-  completedAt   DateTime? // Track when the item was marked as addressed
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  
-  revisionId    String
-  revision      Revision  @relation(fields: [revisionId], references: [id], onDelete: Cascade)
-  
-  @@index([revisionId])
-  @@index([status])
 }
 
 enum FeedbackCategory {
@@ -119,32 +130,4 @@ enum FeedbackStatus {
   MISSED
   NEEDS_CLARIFICATION
   PARTIALLY_ADDRESSED
-}
-
-// ComplianceReport model - the magic output
-model ComplianceReport {
-  id                  String    @id @default(cuid())
-  addressedCount      Int       @default(0)
-  missedCount         Int       @default(0)
-  clarificationCount  Int       @default(0)
-  overallScore        Float?    // Compliance percentage
-  summary             String?   @db.Text
-  recommendations     String?   @db.Text
-  createdAt           DateTime  @default(now())
-  
-  revisionId          String    @unique
-  revision            Revision  @relation(fields: [revisionId], references: [id], onDelete: Cascade)
-}
-
-// Magic Link Token for passwordless authentication
-model MagicToken {
-  id        String   @id @default(cuid())
-  token     String   @unique
-  email     String
-  expires   DateTime
-  role      String?
-  createdAt DateTime @default(now())
-  
-  @@index([token])
-  @@index([email])
 }
