@@ -20,6 +20,12 @@ model User {
   
   projects      Project[]
   sessions      Session[]
+  role          Role      @default(AGENCY)
+}
+
+enum Role {
+  AGENCY
+  CLIENT
 }
 
 
@@ -136,6 +142,7 @@ model MagicToken {
   token     String   @unique
   email     String
   expires   DateTime
+  role      String?
   createdAt DateTime @default(now())
   
   @@index([token])

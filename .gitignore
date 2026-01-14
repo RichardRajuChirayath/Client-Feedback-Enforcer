@@ -41,3 +41,19 @@ yarn-error.log*
 next-env.d.ts
 
 /src/generated/prisma
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Temp files
+temp_*.txt
+dump_url.js
+migrate_temp.js
+test.prisma
+verify_brevo.js
+run_migration.js
+gen_prisma.js
