@@ -32,6 +32,8 @@ interface Revision {
     createdAt: string;
     revisionSummary: string | null;
     feedbackItems: FeedbackItem[];
+    sentiment?: string;
+    tone?: string;
     complianceReport?: {
         addressedCount: number;
         missedCount: number;
@@ -294,7 +296,24 @@ function RevisionCard({ revision, onUpdate, onEmail }: { revision: Revision; onU
                         #{revision.revisionNumber}
                     </div>
                     <div className="flex flex-col">
-                        <span className="text-lg font-bold text-white">Revision Round {revision.revisionNumber}</span>
+                        <div className="flex items-center gap-2 mb-1">
+                            <span className="text-lg font-bold text-white">Revision Round {revision.revisionNumber}</span>
+                            {revision.sentiment && (
+                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border ${revision.sentiment.toLowerCase() === 'frustrated' || revision.sentiment.toLowerCase() === 'negative'
+                                    ? 'bg-red-500/10 text-red-400 border-red-500/20'
+                                    : revision.sentiment.toLowerCase() === 'neutral'
+                                        ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                                        : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                                    }`}>
+                                    {revision.sentiment}
+                                </span>
+                            )}
+                            {revision.tone && (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-white/5 text-slate-400 border border-white/10">
+                                    {revision.tone}
+                                </span>
+                            )}
+                        </div>
                         <span className="caption text-muted-foreground">{new Date(revision.createdAt).toLocaleDateString()}</span>
                     </div>
                 </div>
