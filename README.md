@@ -1,4 +1,4 @@
-# 🎯 Client Feedback Enforcer
+# 🎯 Clyentra (formerly Client Feedback Enforcer)
 
 > **Internal Agency Tool** — Ensure every piece of client feedback is addressed before work goes back.
 

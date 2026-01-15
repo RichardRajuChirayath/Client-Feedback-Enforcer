@@ -67,8 +67,8 @@ export async function sendMagicLinkEmail(email: string, token: string): Promise<
       },
       body: JSON.stringify({
         sender: {
-          name: process.env.BREVO_SENDER_NAME || "Client Feedback Enforcer",
-          email: process.env.BREVO_SENDER_EMAIL || "noreply@feedbackenforcer.app",
+          name: process.env.BREVO_SENDER_NAME || "Clyentra",
+          email: process.env.BREVO_SENDER_EMAIL || "noreply@clyentra.app",
         },
         to: [{ email }],
         subject: "🔐 Your Magic Link to Sign In",
@@ -93,7 +93,7 @@ export async function sendMagicLinkEmail(email: string, token: string): Promise<
                     </tr>
                     <tr>
                       <td align="center" style="padding-bottom: 16px;">
-                        <h1 style="color: #ffffff; font-size: 28px; font-weight: 800; margin: 0;">Client Feedback Enforcer</h1>
+                        <h1 style="color: #ffffff; font-size: 28px; font-weight: 800; margin: 0;">Clyentra</h1>
                       </td>
                     </tr>
                     <tr>

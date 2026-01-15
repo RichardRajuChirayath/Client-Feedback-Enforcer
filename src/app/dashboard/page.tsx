@@ -250,7 +250,7 @@ export default function DashboardPage() {
                 <div className="p-6 border-b border-white/5 flex items-center justify-between font-black tracking-tight text-white">
                     <div className="flex items-center gap-2">
                         <Zap className="w-6 h-6 text-indigo-500 fill-indigo-500" />
-                        <span>FEEDBACK<br />ENFORCER</span>
+                        <span>CLYENTRA</span>
                     </div>
                 </div>
                 <div className="flex-1 overflow-y-auto p-4 space-y-8">

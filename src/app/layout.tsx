@@ -12,8 +12,8 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: 'Client Feedback Enforcer',
-  description: 'Never miss client feedback again. AI-powered enforcement for design agencies.',
+  title: 'Clyentra',
+  description: 'AI-powered client feedback management for designers',
   keywords: ['client feedback', 'design agency', 'feedback management', 'AI compliance'],
 };
 

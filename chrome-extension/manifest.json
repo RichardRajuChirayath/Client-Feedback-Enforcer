@@ -1,6 +1,6 @@
 {
     "manifest_version": 3,
-    "name": "Feedback Enforcer Assistant",
+    "name": "Clyentra",
     "version": "1.0",
     "description": "Capture and enforce client feedback directly from your browser.",
     "permissions": [

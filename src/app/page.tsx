@@ -87,9 +87,8 @@ function LoginContent() {
           </div>
 
           <h1 className="text-6xl font-black tracking-tighter text-white mb-6 leading-tight">
-            Feedback
             <span className="block text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400">
-              Enforcer
+              CLYENTRA
             </span>
           </h1>
 
@@ -115,7 +114,7 @@ function LoginContent() {
             <div className="w-14 h-14 bg-gradient-to-br from-indigo-600 to-purple-700 rounded-2xl flex items-center justify-center mb-4 shadow-lg shadow-indigo-900/20">
               <CheckCircle className="w-7 h-7 text-white" />
             </div>
-            <h2 className="text-2xl font-black text-white tracking-tight">Feedback Enforcer</h2>
+            <h2 className="text-2xl font-black text-white tracking-tight">CLYENTRA</h2>
           </div>
 
           <div className="glass-panel p-8 lg:p-14 rounded-[40px] border border-white/5 shadow-2xl backdrop-blur-xl flex flex-col gap-8 lg:gap-10 w-full max-w-lg mx-auto relative z-20">
@@ -205,12 +204,12 @@ function LoginContent() {
         </div>
 
         <div className="mt-12 text-center lg:hidden">
-          <span className="text-[10px] font-bold text-slate-700 tracking-widest uppercase">© 2026 Feedback Enforcer</span>
+          <span className="text-[10px] font-bold text-slate-700 tracking-widest uppercase">© 2026 Clyentra</span>
         </div>
       </div>
 
       <div className="hidden lg:block absolute bottom-10 left-10">
-        <span className="text-[10px] font-bold text-slate-700 tracking-widest uppercase opacity-60">© 2026 Feedback Enforcer Inc.</span>
+        <span className="text-[10px] font-bold text-slate-700 tracking-widest uppercase opacity-60">© 2026 Clyentra Inc.</span>
       </div>
     </div>
   );
