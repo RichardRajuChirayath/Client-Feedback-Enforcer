@@ -7,7 +7,7 @@ import {
     MessageCircleQuestion, Send, Folder, ChevronRight,
     Zap, LayoutDashboard, Settings, Plus, Clock, MoreVertical,
     Trash2, Edit2, Save, Search, ArrowUpDown, BarChart3, Layers, Download,
-    Chrome
+    Chrome, Globe, Wand2, Lightbulb, AlertTriangle
 } from "lucide-react";
 
 interface User {
@@ -33,6 +33,12 @@ interface AnalysisResult {
     summary: string;
     patterns: string[];
     confidenceScore: number;
+    conflicts?: {
+        roundNumber: number;
+        originalRequest: string;
+        currentRequest: string;
+        explanation: string;
+    }[];
 }
 
 export default function DashboardPage() {
@@ -47,22 +53,26 @@ export default function DashboardPage() {
     const [searchQuery, setSearchQuery] = useState("");
     const [sortBy, setSortBy] = useState<"newest" | "oldest" | "alpha">("newest");
 
-    // Mobile Sidebar State
+    // Sidebars & Modals
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-
-    // Create Project State
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isExtensionModalOpen, setIsExtensionModalOpen] = useState(false);
+    const [activeTab, setActiveTab] = useState<"parser" | "lab">("parser");
+
+    // Project States
     const [newProject, setNewProject] = useState({ name: "", clientName: "", description: "" });
     const [isCreating, setIsCreating] = useState(false);
-
-    // Edit/Delete State
     const [editingProject, setEditingProject] = useState<Project | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
 
-    // Save Result to Project State
+    // Flow States
     const [selectedProjectId, setSelectedProjectId] = useState<string>("");
     const [isSavingRevision, setIsSavingRevision] = useState(false);
-    const [isExtensionModalOpen, setIsExtensionModalOpen] = useState(false);
+
+    // Inspiration Lab States
+    const [inspirationUrl, setInspirationUrl] = useState("");
+    const [isInhaling, setIsInhaling] = useState(false);
+    const [labResult, setLabResult] = useState<any>(null);
 
     useEffect(() => {
         setIsMounted(true);
@@ -76,22 +86,6 @@ export default function DashboardPage() {
             if (data.length > 0 && !selectedProjectId) setSelectedProjectId(data[0].id);
         }
     };
-
-    // Stats Calculation
-    const totalProjects = projects.length;
-    const totalRevisions = projects.reduce((acc, curr) => acc + curr._count.revisions, 0);
-
-    const filteredProjects = projects
-        .filter(p =>
-            p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            (p.clientName && p.clientName.toLowerCase().includes(searchQuery.toLowerCase()))
-        )
-        .sort((a, b) => {
-            if (sortBy === "newest") return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
-            if (sortBy === "oldest") return new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime();
-            if (sortBy === "alpha") return a.name.localeCompare(b.name);
-            return 0;
-        });
 
     useEffect(() => {
         const init = async () => {
@@ -115,7 +109,6 @@ export default function DashboardPage() {
     const handleCreateProject = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!newProject.name.trim()) return;
-
         setIsCreating(true);
         try {
             const res = await fetch("/api/projects", {
@@ -135,7 +128,6 @@ export default function DashboardPage() {
     const handleUpdateProject = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!editingProject) return;
-
         try {
             const res = await fetch(`/api/projects/${editingProject.id}`, {
                 method: "PATCH",
@@ -151,52 +143,15 @@ export default function DashboardPage() {
 
     const handleDeleteProject = async (id: string) => {
         if (!confirm("Are you sure?")) return;
-
         setIsDeleting(true);
         try {
-            const res = await fetch(`/api/projects/${id}`, {
-                method: "DELETE"
-            });
+            const res = await fetch(`/api/projects/${id}`, { method: "DELETE" });
             if (res.ok) {
                 await fetchProjects();
                 if (selectedProjectId === id) setSelectedProjectId(projects.find(p => p.id !== id)?.id || "");
             }
         } catch (e) { console.error(e); }
         finally { setIsDeleting(false); }
-    };
-
-    const handleSaveRevision = async () => {
-        if (!analysisResult) return;
-
-        if (!selectedProjectId) {
-            alert("No project selected! Please create a project first to save this revision.");
-            setIsModalOpen(true);
-            return;
-        }
-
-        setIsSavingRevision(true);
-        try {
-            const res = await fetch(`/api/projects/${selectedProjectId}/revisions`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    tasks: analysisResult.tasks,
-                    questions: analysisResult.questions,
-                    summary: analysisResult.summary,
-                    rawFeedback: feedbackInput
-                }),
-            });
-            if (res.ok) {
-                router.push(`/projects/${selectedProjectId}`);
-            } else {
-                const error = await res.json();
-                alert(error.error || "Failed to save revision");
-            }
-        } catch (e) {
-            console.error(e);
-            alert("An unexpected error occurred while saving.");
-        }
-        finally { setIsSavingRevision(false); }
     };
 
     const handleAnalyze = async () => {
@@ -207,12 +162,69 @@ export default function DashboardPage() {
             const res = await fetch("/api/analyze-feedback", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ text: feedbackInput }),
+                body: JSON.stringify({
+                    text: feedbackInput,
+                    projectId: selectedProjectId || undefined
+                }),
             });
             if (res.ok) setAnalysisResult(await res.json());
         } catch (e) { console.error(e); }
         finally { setIsAnalyzing(false); }
     };
+
+    const handleSaveRevision = async () => {
+        if (!analysisResult) return;
+        if (!selectedProjectId) {
+            alert("No project selected!");
+            return;
+        }
+        setIsSavingRevision(true);
+        try {
+            const res = await fetch(`/api/projects/${selectedProjectId}/revisions`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    tasks: analysisResult.tasks,
+                    questions: analysisResult.questions,
+                    summary: analysisResult.summary,
+                    rawFeedback: feedbackInput,
+                    sentiment: analysisResult.sentiment,
+                    tone: analysisResult.tone
+                }),
+            });
+            if (res.ok) {
+                router.push(`/projects/${selectedProjectId}`);
+            }
+        } catch (e) { console.error(e); }
+        finally { setIsSavingRevision(false); }
+    };
+
+    const handleAnalyzeInspiration = async () => {
+        if (!inspirationUrl.trim()) return;
+        setIsInhaling(true);
+        setLabResult(null);
+        try {
+            const res = await fetch("/api/analyze-inspiration", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ url: inspirationUrl }),
+            });
+            if (res.ok) setLabResult(await res.json());
+        } catch (e) { console.error(e); }
+        finally { setIsInhaling(false); }
+    };
+
+    const totalProjects = projects.length;
+    const totalRevisions = projects.reduce((acc, curr) => acc + curr._count.revisions, 0);
+
+    const filteredProjects = projects
+        .filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()) || (p.clientName && p.clientName.toLowerCase().includes(searchQuery.toLowerCase())))
+        .sort((a, b) => {
+            if (sortBy === "newest") return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+            if (sortBy === "oldest") return new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime();
+            if (sortBy === "alpha") return a.name.localeCompare(b.name);
+            return 0;
+        });
 
     if (!isMounted || isLoading || !user) {
         return (
@@ -224,408 +236,274 @@ export default function DashboardPage() {
 
     return (
         <div className="min-h-screen bg-[#09090b] text-slate-200 flex flex-row relative">
-            {/* Mobile Sidebar Overlay */}
-            {isSidebarOpen && (
-                <div
-                    className="fixed inset-0 bg-black/80 z-40 lg:hidden backdrop-blur-sm animate-in fade-in"
-                    onClick={() => setIsSidebarOpen(false)}
-                />
-            )}
-
-            {/* Sidebar Navigation */}
-            <aside className={`
-                fixed inset-y-0 left-0 z-50 w-72 bg-[#09090b] border-r border-white/5 flex flex-col transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:h-screen
-                ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
-            `}>
-                <div className="p-6 border-b border-white/5 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-500/20">
-                            <Zap className="w-5 h-5 text-white fill-white" />
-                        </div>
-                        <span className="heading-4 text-white tracking-tight">Feedback<br />Enforcer</span>
+            {/* Sidebar */}
+            <aside className={`fixed inset-y-0 left-0 z-50 w-72 bg-[#09090b] border-r border-white/5 flex flex-col transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:h-screen ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+                <div className="p-6 border-b border-white/5 flex items-center justify-between font-black tracking-tight text-white">
+                    <div className="flex items-center gap-2">
+                        <Zap className="w-6 h-6 text-indigo-500 fill-indigo-500" />
+                        <span>FEEDBACK<br />ENFORCER</span>
                     </div>
-                    <button onClick={() => setIsSidebarOpen(false)} className="lg:hidden p-1 rounded-md hover:bg-white/10">
-                        <ChevronRight className="w-6 h-6 rotate-180" />
-                    </button>
                 </div>
-
-                <div className="flex-1 overflow-y-auto p-4 stack-lg">
-                    <div className="stack-sm">
-                        <span className="px-2 caption text-muted-foreground uppercase tracking-widest pl-3">Platform</span>
-                        <nav className="space-y-1">
-                            <button className="w-full flex items-center gap-3 px-3 py-2 rounded-lg bg-white/5 text-white font-medium">
-                                <LayoutDashboard className="w-4 h-4" />
-                                Dashboard
+                <div className="flex-1 overflow-y-auto p-4 space-y-8">
+                    <div className="space-y-2">
+                        <span className="px-2 text-[10px] font-black text-slate-600 uppercase tracking-widest pl-3">Platform</span>
+                        <div className="space-y-1">
+                            <button onClick={() => setActiveTab("parser")} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'parser' ? 'bg-indigo-600/10 text-indigo-400' : 'text-slate-500 hover:text-white hover:bg-white/5'}`}>
+                                <LayoutDashboard className="w-4 h-4" /> Feedback Parser
                             </button>
-                            <button className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-colors font-medium">
-                                <Settings className="w-4 h-4" />
-                                Settings
-                            </button>
-                        </nav>
-                    </div>
-
-                    <div className="stack-sm">
-                        <div className="flex items-center justify-between px-2 pl-3">
-                            <span className="caption text-muted-foreground uppercase tracking-widest">Projects</span>
-                            <button onClick={() => setIsModalOpen(true)} className="p-1 hover:bg-white/10 rounded transition-colors">
-                                <Plus className="w-4 h-4 text-slate-400 hover:text-white" />
+                            <button onClick={() => setActiveTab("lab")} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'lab' ? 'bg-indigo-600/10 text-indigo-400' : 'text-slate-500 hover:text-white hover:bg-white/5'}`}>
+                                <Wand2 className="w-4 h-4" /> Inspiration Lab
                             </button>
                         </div>
-                        <nav className="space-y-1" style={{ maxHeight: 'calc(100vh - 400px)', overflowY: 'auto' }}>
+                    </div>
+
+                    <div className="space-y-4">
+                        <div className="flex items-center justify-between px-3">
+                            <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest">Projects</span>
+                            <button onClick={() => setIsModalOpen(true)} className="p-1 hover:bg-white/5 rounded text-slate-500 hover:text-white"><Plus className="w-4 h-4" /></button>
+                        </div>
+                        <div className="space-y-1">
                             {projects.map(p => (
-                                <button
-                                    key={p.id}
-                                    onClick={() => router.push(`/projects/${p.id}`)}
-                                    className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-colors text-sm group"
-                                >
-                                    <Folder className="w-4 h-4 text-slate-600 group-hover:text-indigo-400 transition-colors" />
-                                    <span className="truncate">{p.name}</span>
+                                <button key={p.id} onClick={() => router.push(`/projects/${p.id}`)} className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-slate-400 hover:text-white hover:bg-white/5 transition-all truncate">
+                                    <Folder className="w-4 h-4 opacity-50" /> {p.name}
                                 </button>
                             ))}
-                            {projects.length === 0 && (
-                                <div className="px-3 py-4 text-xs text-slate-600 border border-dashed border-white/5 rounded-lg text-center">
-                                    No projects created
-                                </div>
-                            )}
-                        </nav>
-                    </div>
-                    <div className="stack-sm">
-                        <span className="px-2 caption text-muted-foreground uppercase tracking-widest pl-3">Apps</span>
-                        <div className="px-4 py-3 bg-indigo-500/5 rounded-xl border border-indigo-500/10 group hover:border-indigo-500/30 transition-all">
-                            <div className="flex items-center gap-2 mb-2">
-                                <Chrome className="w-4 h-4 text-indigo-400" />
-                                <span className="text-xs font-bold text-indigo-100">Chrome Extension</span>
-                            </div>
-                            <p className="text-[10px] text-slate-500 leading-relaxed mb-3">
-                                Enforce feedback directly from Gmail or Slack.
-                            </p>
-                            <button
-                                onClick={() => setIsExtensionModalOpen(true)}
-                                className="w-full flex items-center justify-center gap-2 py-2 rounded-lg bg-indigo-600 text-[11px] font-black text-white hover:bg-indigo-500 transition-colors"
-                            >
-                                <Download className="w-3 h-3" />
-                                SETUP ASSISTANT
-                            </button>
                         </div>
                     </div>
                 </div>
 
-                <div className="p-4 border-t border-white/5">
-                    <button
-                        onClick={handleLogout}
-                        className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-500/5 transition-colors text-sm font-medium"
-                    >
-                        <LogOut className="w-4 h-4" />
-                        Sign Out
-                    </button>
-                    <div className="mt-4 px-3 flex items-center gap-3 pt-4 border-t border-white/5">
-                        <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center text-xs font-bold text-white">
-                            {user?.name?.[0] || "U"}
+                <div className="p-6 border-t border-white/5 bg-white/[0.01]">
+                    <div className="bg-indigo-600/5 border border-indigo-600/10 rounded-2xl p-4 mb-4">
+                        <div className="flex items-center gap-2 text-indigo-400 mb-1">
+                            <Chrome className="w-4 h-4" />
+                            <span className="text-[10px] font-black uppercase tracking-widest">Extension</span>
                         </div>
-                        <div className="flex flex-col min-w-0">
-                            <span className="text-sm font-medium text-white truncate">{user?.name || "User"}</span>
-                            <span className="text-xs text-slate-500 truncate">{user?.email}</span>
-                        </div>
+                        <p className="text-[10px] text-slate-500 mb-3 leading-relaxed font-medium">Extract feedback directly from Gmail or Slack.</p>
+                        <button onClick={() => setIsExtensionModalOpen(true)} className="w-full py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-black rounded-lg transition-all">SETUP ASSISTANT</button>
                     </div>
+                    <button onClick={handleLogout} className="flex items-center gap-2 text-sm text-slate-500 hover:text-red-400 transition-colors pl-2">
+                        <LogOut className="w-4 h-4" /> Sign Out
+                    </button>
                 </div>
             </aside>
 
             {/* Main Content */}
-            <main className="flex-1 min-w-0 h-screen overflow-y-auto">
-                {/* Mobile Header */}
-                <div className="lg:hidden h-16 border-b border-white/5 flex items-center justify-between px-4 bg-[#09090b] sticky top-0 z-30">
-                    <div className="flex items-center gap-3">
-                        <button onClick={() => setIsSidebarOpen(true)} className="p-2 -ml-2 rounded-lg hover:bg-white/10 text-slate-400">
-                            <LayoutDashboard className="w-6 h-6" />
-                        </button>
-                        <span className="font-bold text-white">Dashboard</span>
-                    </div>
-                    <div className="w-8 h-8 rounded-full bg-indigo-500/20 flex items-center justify-center text-xs font-bold text-indigo-400">
-                        {user?.name?.[0] || "U"}
-                    </div>
-                </div>
-
-                <div className="max-w-6xl mx-auto p-4 lg:p-12 stack-lg pb-32">
-                    {/* Header with Stats */}
-                    <div className="flex flex-col gap-8 pb-10 border-b border-border">
-                        <div className="flex items-end justify-between">
-                            <div>
-                                <h1 className="heading-1">Overview</h1>
-                                <p className="body-base text-muted-foreground" style={{ marginTop: 'var(--space-2)' }}>Manage feedback and project revisions</p>
-                            </div>
-                            <button
-                                onClick={() => setIsModalOpen(true)}
-                                className="btn btn-primary btn-lg"
-                            >
-                                <Plus className="w-5 h-5" />
-                                New Project
-                            </button>
+            <main className="flex-1 h-screen overflow-y-auto bg-[#09090b]">
+                <div className="max-w-6xl mx-auto p-6 lg:p-12 space-y-12">
+                    {/* Header */}
+                    <div className="flex items-end justify-between border-b border-white/5 pb-10">
+                        <div>
+                            <h1 className="text-4xl lg:text-5xl font-black text-white tracking-tight">{activeTab === 'parser' ? 'FEEDBACK DNA' : 'INSPIRATION LAB'}</h1>
+                            <p className="text-slate-500 mt-2 font-medium">{activeTab === 'parser' ? 'Paste client feedback to extract technical items' : 'Analyze competitor designs for strategic insights'}</p>
                         </div>
-
-                        {/* Dashboard Stats */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                            <div className="card p-6 flex items-center gap-4 border-l-4 border-l-indigo-500">
-                                <div className="p-3 rounded-xl bg-indigo-500/10 text-indigo-400">
-                                    <Folder className="w-6 h-6" />
-                                </div>
-                                <div>
-                                    <p className="caption text-muted-foreground">Active Projects</p>
-                                    <p className="heading-2">{totalProjects}</p>
-                                </div>
-                            </div>
-                            <div className="card p-6 flex items-center gap-4 border-l-4 border-l-emerald-500">
-                                <div className="p-3 rounded-xl bg-emerald-500/10 text-emerald-400">
-                                    <Layers className="w-6 h-6" />
-                                </div>
-                                <div>
-                                    <p className="caption text-muted-foreground">Total Revisions</p>
-                                    <p className="heading-2">{totalRevisions}</p>
-                                </div>
-                            </div>
-                            <div className="card p-6 flex items-center gap-4 border-l-4 border-l-amber-500">
-                                <div className="p-3 rounded-xl bg-amber-500/10 text-amber-400">
-                                    <BarChart3 className="w-6 h-6" />
-                                </div>
-                                <div>
-                                    <p className="caption text-muted-foreground">Avg. Revisions</p>
-                                    <p className="heading-2">{totalProjects > 0 ? (totalRevisions / totalProjects).toFixed(1) : 0}</p>
-                                </div>
+                        <div className="flex gap-4">
+                            <div className="hidden lg:flex flex-col items-end">
+                                <span className="text-[10px] font-black text-indigo-500 uppercase tracking-widest">Efficiency</span>
+                                <span className="text-2xl font-black text-white">{totalRevisions} Rounds</span>
                             </div>
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-12" style={{ gap: 'var(--space-10)' }}>
-                        {/* AI Parser */}
-                        <div className="col-span-12 lg:col-span-7 stack-md">
-                            <div className="card shadow-2xl">
-                                <div className="card-header">
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-2">
-                                            <Sparkles className="w-5 h-5 text-primary" />
-                                            <span className="caption text-foreground">AI Feedback Parser</span>
-                                        </div>
-                                        <span className="caption text-muted-foreground">Llama 3.3 Engine</span>
+                    <div className="grid grid-cols-12 gap-12">
+                        {/* Tool Column */}
+                        <div className="col-span-12 lg:col-span-7 space-y-8">
+                            {activeTab === 'parser' ? (
+                                <div className="space-y-6">
+                                    <div className="bg-[#0f0f13] border border-white/5 rounded-[32px] p-8 shadow-2xl relative overflow-hidden group">
+                                        <div className="absolute top-0 right-0 p-4 opacity-50"><Sparkles className="w-12 h-12 text-indigo-500/20" /></div>
+                                        <textarea
+                                            value={feedbackInput}
+                                            onChange={(e) => setFeedbackInput(e.target.value)}
+                                            placeholder="Paste the 'Client Talk' here..."
+                                            className="w-full h-80 bg-transparent border-none text-xl text-white placeholder:text-slate-700 focus:ring-0 resize-none font-medium leading-relaxed"
+                                        />
+                                        <button
+                                            onClick={handleAnalyze}
+                                            disabled={isAnalyzing || !feedbackInput.trim()}
+                                            className="w-full h-16 bg-white text-black font-black text-lg rounded-2xl flex items-center justify-center gap-3 hover:bg-slate-200 transition-all disabled:opacity-50"
+                                        >
+                                            {isAnalyzing ? <Loader2 className="w-6 h-6 animate-spin" /> : <><Zap className="w-6 h-6 fill-black" /> EXTRACT SIGNALS</>}
+                                        </button>
                                     </div>
-                                </div>
-                                <div className="card-content">
-                                    <textarea
-                                        value={feedbackInput}
-                                        onChange={(e) => setFeedbackInput(e.target.value)}
-                                        placeholder="Paste client feedback here... (emails, Slack messages, meeting notes)"
-                                        className="input resize-none"
-                                        style={{ height: '16rem', marginBottom: 'var(--space-4)' }}
-                                    />
-                                    <button
-                                        onClick={handleAnalyze}
-                                        disabled={isAnalyzing || !feedbackInput.trim()}
-                                        className="btn btn-primary btn-lg w-full"
-                                    >
-                                        {isAnalyzing ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Send className="w-5 h-5" />Parse Feedback</>}
-                                    </button>
-                                </div>
-                            </div>
 
-                            {/* Results */}
-                            {analysisResult && (
-                                <div className="card shadow-2xl animate-in fade-in slide-in-from-top-4 duration-500">
-                                    <div className="card-content stack-lg">
-                                        <div className="stack-sm">
-                                            <div className="flex items-center justify-between">
-                                                <span className="caption text-primary">Analysis Summary</span>
-                                                <div className="flex items-center gap-2">
-                                                    <span className="caption text-muted-foreground">Confidence Score:</span>
-                                                    <div className="w-24 h-2 bg-white/10 rounded-full overflow-hidden">
-                                                        <div
-                                                            className={`h-full rounded-full ${analysisResult.confidenceScore > 80 ? 'bg-emerald-500' : analysisResult.confidenceScore > 50 ? 'bg-amber-500' : 'bg-red-500'}`}
-                                                            style={{ width: `${analysisResult.confidenceScore}%` }}
-                                                        />
-                                                    </div>
-                                                    <span className="caption font-mono text-white">{analysisResult.confidenceScore}%</span>
+                                    {analysisResult && (
+                                        <div className="bg-[#0f0f13] border border-emerald-500/10 rounded-[32px] p-8 shadow-2xl animate-in fade-in slide-in-from-top-4">
+                                            <div className="flex items-center justify-between mb-8">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-black uppercase rounded-full">Analysis Complete</div>
+                                                    <span className="text-sm font-bold text-slate-500">Confidence: {analysisResult.confidenceScore}%</span>
+                                                </div>
+                                                <div className="flex gap-2">
+                                                    <span className="px-3 py-1 bg-white/5 text-slate-400 text-[10px] font-black uppercase rounded-full">{analysisResult.sentiment}</span>
+                                                    <span className="px-3 py-1 bg-white/5 text-slate-400 text-[10px] font-black uppercase rounded-full">{analysisResult.tone}</span>
                                                 </div>
                                             </div>
-                                            <h3 className="heading-3">{analysisResult.summary}</h3>
-                                            <div className="flex gap-2 flex-wrap" style={{ marginTop: 'var(--space-2)' }}>
-                                                <span className={`caption px-3 py-1.5 rounded border flex items-center gap-1.5 ${analysisResult.sentiment === 'positive' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' :
-                                                    analysisResult.sentiment === 'negative' ? 'bg-red-500/10 border-red-500/20 text-red-400' :
-                                                        analysisResult.sentiment === 'urgent' ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' :
-                                                            'bg-white/5 border-white/10 text-muted-foreground'
-                                                    }`}>
-                                                    {analysisResult.sentiment === 'positive' && '😊'}
-                                                    {analysisResult.sentiment === 'neutral' && '😐'}
-                                                    {analysisResult.sentiment === 'negative' && '😤'}
-                                                    {analysisResult.sentiment === 'urgent' && '🔥'}
-                                                    <span className="uppercase">{analysisResult.sentiment}</span>
-                                                </span>
-                                                <span className="caption px-3 py-1.5 rounded bg-white/5 border border-white/10 text-muted-foreground">Tone: {analysisResult.tone}</span>
-                                                {analysisResult.patterns && analysisResult.patterns.map((pattern, i) => (
-                                                    <span key={i} className="caption px-3 py-1.5 rounded bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 flex items-center gap-1.5">
-                                                        <Sparkles className="w-3 h-3" />
-                                                        DNA: {pattern}
-                                                    </span>
-                                                ))}
-                                            </div>
-                                        </div>
 
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-10 pt-8 border-t border-border">
-                                            <div className="stack-sm">
-                                                <h4 className="caption text-emerald-400 flex items-center gap-2">
-                                                    <CheckCircle2 className="w-4 h-4" /> Action Items
-                                                </h4>
-                                                <ul className="stack-sm">
-                                                    {analysisResult.tasks.map((t, i) => (
-                                                        <li key={i} className="body-base text-slate-300 bg-white/[0.02] border border-white/5 rounded-lg leading-relaxed" style={{ padding: 'var(--space-4)' }}>{t}</li>
-                                                    ))}
-                                                </ul>
-                                            </div>
-                                            <div className="stack-sm">
-                                                <h4 className="caption text-amber-400 flex items-center gap-2">
-                                                    <MessageCircleQuestion className="w-4 h-4" /> Pending Questions
-                                                </h4>
-                                                <ul className="stack-sm">
-                                                    {analysisResult.questions.map((q, i) => (
-                                                        <li key={i} className="body-base text-slate-300 bg-white/[0.02] border border-white/5 rounded-lg leading-relaxed italic border-l-2 border-l-amber-500/30" style={{ padding: 'var(--space-4)' }}>{q}</li>
-                                                    ))}
-                                                </ul>
-                                            </div>
-                                        </div>
+                                            <h2 className="text-2xl font-black text-white mb-8">{analysisResult.summary}</h2>
 
-                                        <div className="pt-10 border-t border-border mt-4">
-                                            <div className="card bg-primary/5 border-primary/20 p-8 flex flex-col md:flex-row items-center justify-between gap-6">
-                                                <div className="stack-sm">
-                                                    <h4 className="body-lg font-black text-white">Save to Project</h4>
-                                                    <p className="body-sm text-muted-foreground">Convert this analysis into a new revision round.</p>
+                                            {analysisResult.conflicts && analysisResult.conflicts.length > 0 && (
+                                                <div className="mb-10 p-6 bg-red-500/10 border-2 border-red-500/20 rounded-3xl space-y-4 animate-in shake duration-500">
+                                                    <div className="flex items-center gap-3 text-red-400">
+                                                        <AlertTriangle className="w-6 h-6" />
+                                                        <h4 className="text-[10px] font-black uppercase tracking-[0.2em]">CIRCULAR LOOP DETECTED</h4>
+                                                    </div>
+                                                    <div className="space-y-4">
+                                                        {analysisResult.conflicts.map((conflict, i) => (
+                                                            <div key={i} className="p-4 bg-black/40 rounded-2xl border border-red-500/10 space-y-3">
+                                                                <div className="flex justify-between items-start gap-4">
+                                                                    <div className="space-y-1">
+                                                                        <span className="text-[9px] font-black text-slate-500 uppercase">Original Round {conflict.roundNumber}</span>
+                                                                        <p className="text-xs text-slate-300 italic">"{conflict.originalRequest}"</p>
+                                                                    </div>
+                                                                    <div className="space-y-1 text-right">
+                                                                        <span className="text-[9px] font-black text-red-400 uppercase">New Contradiction</span>
+                                                                        <p className="text-xs text-white font-bold">"{conflict.currentRequest}"</p>
+                                                                    </div>
+                                                                </div>
+                                                                <p className="text-[11px] text-red-300 font-medium pt-2 border-t border-red-500/10">
+                                                                    <span className="font-black">DEFENSE STRATEGY:</span> {conflict.explanation}
+                                                                </p>
+                                                            </div>
+                                                        ))}
+                                                    </div>
                                                 </div>
-                                                {projects.length > 0 ? (
-                                                    <div className="flex items-center gap-4 w-full md:w-auto">
-                                                        <select
-                                                            value={selectedProjectId}
-                                                            onChange={(e) => setSelectedProjectId(e.target.value)}
-                                                            className="input py-3 text-sm min-w-[200px]"
-                                                        >
-                                                            {projects.map(p => (
-                                                                <option key={p.id} value={p.id}>{p.name}</option>
-                                                            ))}
-                                                        </select>
-                                                        <button
-                                                            onClick={handleSaveRevision}
-                                                            disabled={isSavingRevision}
-                                                            className="btn btn-primary whitespace-nowrap"
-                                                        >
-                                                            {isSavingRevision ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Save className="w-4 h-4" /> Save Revision</>}
-                                                        </button>
-                                                    </div>
-                                                ) : (
-                                                    <div className="flex flex-col items-center md:items-end gap-3 w-full md:w-auto">
-                                                        <p className="text-sm font-bold text-amber-400 bg-amber-400/10 px-4 py-2 rounded-lg border border-amber-400/20">
-                                                            No projects found. Create one to save this revision.
-                                                        </p>
-                                                        <button
-                                                            onClick={() => setIsModalOpen(true)}
-                                                            className="btn btn-primary w-full md:w-auto"
-                                                        >
-                                                            <Plus className="w-4 h-4" /> Create Project
-                                                        </button>
-                                                    </div>
-                                                )}
+                                            )}
+
+                                            <div className="grid grid-cols-2 gap-8 mb-10">
+                                                <div>
+                                                    <h4 className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mb-4 flex items-center gap-2">
+                                                        <CheckCircle2 className="w-4 h-4" /> Action Items
+                                                    </h4>
+                                                    <ul className="space-y-3">
+                                                        {analysisResult.tasks.map((t, i) => <li key={i} className="text-sm text-slate-400 leading-relaxed border-l-2 border-emerald-500/30 pl-4">{t}</li>)}
+                                                    </ul>
+                                                </div>
+                                                <div>
+                                                    <h4 className="text-[10px] font-black text-amber-500 uppercase tracking-widest mb-4 flex items-center gap-2">
+                                                        <MessageCircleQuestion className="w-4 h-4" /> Critical Gaps
+                                                    </h4>
+                                                    <ul className="space-y-3">
+                                                        {analysisResult.questions.map((q, i) => <li key={i} className="text-sm text-slate-400 leading-relaxed italic border-l-2 border-amber-500/30 pl-4">{q}</li>)}
+                                                    </ul>
+                                                </div>
                                             </div>
+
+                                            <div className="p-6 bg-white/5 rounded-2xl border border-white/5 flex items-center justify-between gap-6">
+                                                <div className="flex-1">
+                                                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Save to Round</p>
+                                                    <select value={selectedProjectId} onChange={(e) => setSelectedProjectId(e.target.value)} className="w-full bg-transparent border-none text-white font-bold p-0 focus:ring-0">
+                                                        {projects.map(p => <option key={p.id} value={p.id} className="bg-[#0f0f13]">{p.name}</option>)}
+                                                    </select>
+                                                </div>
+                                                <button onClick={handleSaveRevision} disabled={isSavingRevision} className="h-12 px-8 bg-indigo-600 hover:bg-indigo-500 text-white font-black rounded-xl transition-all">
+                                                    {isSavingRevision ? <Loader2 className="w-4 h-4 animate-spin" /> : "COMMIT REVISION"}
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            ) : (
+                                <div className="space-y-8">
+                                    <div className="bg-[#0f0f13] border border-white/5 rounded-[32px] p-8 space-y-6">
+                                        <p className="text-slate-500 font-medium">Drop a URL below. I'll deconstruct the design DNA and give you a strategy.</p>
+                                        <div className="flex gap-3">
+                                            <input
+                                                type="url"
+                                                value={inspirationUrl}
+                                                onChange={(e) => setInspirationUrl(e.target.value)}
+                                                placeholder="https://stripe.com"
+                                                className="w-full h-14 bg-white/5 border border-white/5 rounded-xl px-6 text-white font-medium focus:ring-2 focus:ring-indigo-600 transition-all outline-none"
+                                            />
+                                            <button onClick={handleAnalyzeInspiration} disabled={isInhaling || !inspirationUrl.trim()} className="h-14 px-8 bg-white text-black font-black rounded-xl hover:bg-slate-200 transition-all">
+                                                {isInhaling ? <Loader2 className="w-5 h-5 animate-spin" /> : "INHALA DNA"}
+                                            </button>
                                         </div>
                                     </div>
+
+                                    {labResult && (
+                                        <div className="bg-[#0f0f13] border border-indigo-500/20 rounded-[32px] p-10 space-y-10 animate-in slide-in-from-bottom-8 duration-500">
+                                            <div className="flex items-center gap-6 pb-8 border-b border-white/5">
+                                                <div className="w-16 h-16 rounded-[24px] bg-indigo-600/10 flex items-center justify-center border border-indigo-500/20"><Globe className="w-8 h-8 text-indigo-400" /></div>
+                                                <div>
+                                                    <h3 className="text-3xl font-black text-white">{labResult.title}</h3>
+                                                    <p className="text-indigo-400 font-black uppercase tracking-[0.3em] text-sm">{labResult.vibe}</p>
+                                                </div>
+                                            </div>
+
+                                            <div className="grid grid-cols-2 gap-10">
+                                                <div className="space-y-4">
+                                                    <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">DESIGN PRINCIPLES</span>
+                                                    <div className="flex flex-wrap gap-2">
+                                                        {labResult.designPrinciples.map((p: any) => <span key={p} className="px-3 py-1.5 bg-white/5 border border-white/10 rounded-lg text-xs font-bold text-slate-300">{p}</span>)}
+                                                    </div>
+                                                </div>
+                                                <div className="space-y-4">
+                                                    <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">DOMINANT PALETTE</span>
+                                                    <div className="flex gap-2">
+                                                        {labResult.colorPalette.map((c: any) => <div key={c} className="w-10 h-10 rounded-xl border border-white/10 shadow-lg" style={{ backgroundColor: c }} title={c} />)}
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div className="p-8 bg-indigo-600/5 rounded-3xl border border-indigo-600/10">
+                                                <h4 className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-4 flex items-center gap-2"><Sparkles className="w-4 h-4" /> CORE STRATEGY</h4>
+                                                <p className="text-lg text-slate-300 font-medium leading-relaxed italic">{labResult.uxStrategy}</p>
+                                            </div>
+
+                                            <div className="space-y-6">
+                                                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">IMMEDIATE ACTIONS</span>
+                                                <div className="grid gap-4">
+                                                    {labResult.advice.map((a: any, i: number) => (
+                                                        <div key={i} className="flex items-center gap-4 bg-white/5 p-4 rounded-2xl border border-white/5">
+                                                            <div className="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-xs font-black text-white shrink-0">{i + 1}</div>
+                                                            <p className="text-sm text-slate-300 font-bold">{a}</p>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             )}
                         </div>
 
-                        {/* Projects */}
-                        <div className="col-span-12 lg:col-span-5">
-                            <div className="card shadow-xl flex flex-col" style={{ minHeight: '500px' }}>
-                                <div style={{ padding: 'var(--space-6) var(--space-6) var(--space-5)', borderBottom: '1px solid rgb(var(--border) / 0.1)' }}>
-                                    <div className="flex flex-col gap-4">
-                                        <div className="flex items-center justify-between">
-                                            <span className="caption text-foreground">Projects List</span>
-                                            <div className="flex items-center gap-2">
-                                                <select
-                                                    value={sortBy}
-                                                    onChange={(e) => setSortBy(e.target.value as any)}
-                                                    className="bg-transparent text-xs text-muted-foreground border-none outline-none cursor-pointer hover:text-white transition-colors text-right"
-                                                >
-                                                    <option value="newest">Newest First</option>
-                                                    <option value="oldest">Oldest First</option>
-                                                    <option value="alpha">A-Z Name</option>
-                                                </select>
-                                                <ArrowUpDown className="w-3 h-3 text-muted-foreground" />
-                                            </div>
-                                        </div>
-                                        <div className="relative">
-                                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                                            <input
-                                                type="text"
-                                                placeholder="Search projects..."
-                                                value={searchQuery}
-                                                onChange={(e) => setSearchQuery(e.target.value)}
-                                                className="input w-full pl-9 py-2 text-sm bg-black/20 focus:bg-black/40 transition-colors"
-                                            />
-                                        </div>
+                        {/* Recent Projects Column */}
+                        <div className="col-span-12 lg:col-span-5 space-y-8">
+                            <div className="bg-[#0f0f13] border border-white/5 rounded-[32px] p-8">
+                                <div className="flex items-center justify-between mb-8">
+                                    <h3 className="text-xl font-black text-white">ACTIVE FILES</h3>
+                                    <div className="flex items-center gap-2">
+                                        <Search className="w-4 h-4 text-slate-600" />
+                                        <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Filter..." className="bg-transparent border-none text-xs text-white p-0 focus:ring-0 w-24" />
                                     </div>
                                 </div>
-                                <div className="p-2 flex-1">
-                                    {projects.length === 0 ? (
-                                        <div className="h-full flex flex-col items-center justify-center text-center" style={{ padding: 'var(--space-12)' }}>
-                                            <div className="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center" style={{ marginBottom: 'var(--space-4)' }}>
-                                                <Folder className="w-8 h-8 text-muted-foreground" />
-                                            </div>
-                                            <p className="body-base font-bold text-foreground/60" style={{ marginBottom: 'var(--space-2)' }}>No Projects Yet</p>
-                                            <p className="body-sm text-muted-foreground max-w-[200px] leading-relaxed">Create your first project to start tracking client feedback</p>
-                                        </div>
-                                    ) : (
-                                        <div className="stack-sm">
-                                            {filteredProjects.length === 0 ? (
-                                                <div className="py-12 text-center text-muted-foreground">
-                                                    <p>No projects match your search.</p>
-                                                    <button onClick={() => setSearchQuery("")} className="text-primary hover:underline mt-2 text-sm">Clear search</button>
+
+                                <div className="space-y-2">
+                                    {filteredProjects.map(p => (
+                                        <div key={p.id} className="relative group">
+                                            <button onClick={() => router.push(`/projects/${p.id}`)} className="w-full flex items-center gap-4 p-4 rounded-2xl hover:bg-white/5 transition-all text-left">
+                                                <div className="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center text-slate-500 group-hover:text-indigo-400 transition-colors"><Folder className="w-6 h-6" /></div>
+                                                <div className="flex-1 min-w-0">
+                                                    <h4 className="font-bold text-white truncate">{p.name}</h4>
+                                                    <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest mt-1">{p.clientName || 'Private'}</p>
                                                 </div>
-                                            ) : (
-                                                filteredProjects.map((p) => (
-                                                    <div key={p.id} className="relative group">
-                                                        <button
-                                                            onClick={() => router.push(`/projects/${p.id}`)}
-                                                            className="w-full flex items-center gap-4 rounded-xl hover:bg-white/5 transition-all text-left" style={{ padding: 'var(--space-4)' }}
-                                                        >
-                                                            <div className="w-10 h-10 rounded-lg bg-white/5 flex items-center justify-center">
-                                                                <Folder className="w-5 h-5 text-muted-foreground" />
-                                                            </div>
-                                                            <div className="flex-1 min-w-0">
-                                                                <h4 className="body-base font-bold text-foreground group-hover:text-primary transition-colors">{p.name}</h4>
-                                                                <p className="caption text-muted-foreground" style={{ marginTop: 'var(--space-1)' }}>{p.clientName || 'Private Client'}</p>
-                                                            </div>
-                                                            <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-all transform group-hover:translate-x-1" />
-                                                        </button>
-                                                        <div className="absolute right-12 top-1/2 -translate-y-1/2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                            <button
-                                                                onClick={(e) => { e.stopPropagation(); setEditingProject(p); }}
-                                                                className="p-2 hover:bg-white/10 rounded-lg text-muted-foreground hover:text-white transition-colors"
-                                                            >
-                                                                <Edit2 className="w-4 h-4" />
-                                                            </button>
-                                                            <button
-                                                                onClick={(e) => { e.stopPropagation(); handleDeleteProject(p.id); }}
-                                                                className="p-2 hover:bg-red-500/20 rounded-lg text-muted-foreground hover:text-red-400 transition-colors"
-                                                            >
-                                                                <Trash2 className="w-4 h-4" />
-                                                            </button>
-                                                        </div>
-                                                    </div>
-                                                ))
-                                            )}
+                                                <ChevronRight className="w-4 h-4 text-slate-700 group-hover:translate-x-1 group-hover:text-white transition-all" />
+                                            </button>
+                                            <div className="absolute right-12 top-1/2 -translate-y-1/2 flex gap-1 opacity-0 group-hover:opacity-100 transition-all scale-95 group-hover:scale-100">
+                                                <button onClick={(e) => { e.stopPropagation(); setEditingProject(p); }} className="p-2 bg-white/5 hover:bg-indigo-600/20 rounded-lg text-slate-500 hover:text-indigo-400 transition-all"><Edit2 className="w-4 h-4" /></button>
+                                                <button onClick={(e) => { e.stopPropagation(); handleDeleteProject(p.id); }} className="p-2 bg-white/5 hover:bg-red-600/20 rounded-lg text-slate-500 hover:text-red-400 transition-all"><Trash2 className="w-4 h-4" /></button>
+                                            </div>
                                         </div>
-                                    )}
+                                    ))}
+                                    {projects.length === 0 && <p className="text-center py-12 text-slate-700 text-sm font-bold">No projects archived yet.</p>}
                                 </div>
-                                <div style={{ padding: 'var(--space-4)', borderTop: '1px solid rgb(var(--border) / 0.1)' }}>
-                                    <button
-                                        onClick={() => setIsModalOpen(true)}
-                                        className="w-full py-2 caption text-muted-foreground hover:text-foreground transition-all"
-                                    >
-                                        Create New Project
-                                    </button>
-                                </div>
+                            </div>
+
+                            <div className="bg-gradient-to-br from-indigo-600 to-purple-700 rounded-[32px] p-8 text-white relative overflow-hidden group">
+                                <div className="absolute top-0 right-0 p-8 opacity-20"><Plus className="w-24 h-24 rotate-12" /></div>
+                                <h3 className="text-2xl font-black mb-2">Build Proof.</h3>
+                                <p className="text-indigo-100 text-sm font-medium mb-6 opacity-80">Stop revisions before they start. Create a new case study project now.</p>
+                                <button onClick={() => setIsModalOpen(true)} className="px-6 h-12 bg-white text-indigo-600 font-black rounded-xl hover:scale-105 transition-all active:scale-95 shadow-xl">START NEW PROJECT</button>
                             </div>
                         </div>
                     </div>
@@ -634,193 +512,65 @@ export default function DashboardPage() {
 
             {/* Create Project Modal */}
             {isModalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-6 pb-20 lg:p-10">
-                    <div className="absolute inset-0 bg-black/60 backdrop-blur-md" onClick={() => setIsModalOpen(false)} />
-                    <div className="relative w-full max-w-xl card shadow-2xl animate-in fade-in zoom-in-95 duration-200 overflow-hidden">
-                        <div className="card-header flex items-center justify-between">
-                            <h2 className="heading-3">Create New Project</h2>
-                            <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-white/5 rounded-lg transition-colors">
-                                <Plus className="w-6 h-6 rotate-45 text-muted-foreground" />
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
+                    <div className="absolute inset-0 bg-black/90 backdrop-blur-xl" onClick={() => setIsModalOpen(false)} />
+                    <div className="relative w-full max-w-xl bg-[#0f0f13] border border-white/5 rounded-[40px] p-10 shadow-2xl animate-in zoom-in-95">
+                        <h2 className="text-3xl font-black text-white mb-2">New Target.</h2>
+                        <p className="text-slate-500 mb-8 font-medium">Define your project parameters to start tracking revisions.</p>
+                        <form onSubmit={handleCreateProject} className="space-y-6">
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Project Name</label>
+                                <input autoFocus required value={newProject.name} onChange={(e) => setNewProject({ ...newProject, name: e.target.value })} className="w-full h-14 bg-white/5 border border-white/5 rounded-2xl px-6 text-white font-bold outline-none focus:ring-2 focus:ring-indigo-600" />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Client Name</label>
+                                <input value={newProject.clientName} onChange={(e) => setNewProject({ ...newProject, clientName: e.target.value })} className="w-full h-14 bg-white/5 border border-white/5 rounded-2xl px-6 text-white font-bold outline-none focus:ring-2 focus:ring-indigo-600" />
+                            </div>
+                            <button disabled={isCreating} className="w-full h-16 bg-white text-black font-black text-lg rounded-2xl mt-4 flex items-center justify-center">
+                                {isCreating ? <Loader2 className="w-6 h-6 animate-spin" /> : "CREATE ARCHIVE"}
                             </button>
-                        </div>
-                        <form onSubmit={handleCreateProject} className="card-content stack-lg">
-                            <div className="stack-sm">
-                                <label className="caption text-muted-foreground ml-1">Project Name</label>
-                                <input
-                                    autoFocus
-                                    type="text"
-                                    required
-                                    value={newProject.name}
-                                    onChange={(e) => setNewProject({ ...newProject, name: e.target.value })}
-                                    className="input"
-                                    placeholder="e.g. Modern E-commerce Website"
-                                />
-                            </div>
-                            <div className="stack-sm">
-                                <label className="caption text-muted-foreground ml-1">Client Name</label>
-                                <input
-                                    type="text"
-                                    value={newProject.clientName}
-                                    onChange={(e) => setNewProject({ ...newProject, clientName: e.target.value })}
-                                    className="input"
-                                    placeholder="e.g. Acme Corp"
-                                />
-                            </div>
-                            <div className="stack-sm">
-                                <label className="caption text-muted-foreground ml-1">Description (Optional)</label>
-                                <textarea
-                                    value={newProject.description || ""}
-                                    onChange={(e) => setNewProject({ ...newProject, description: e.target.value })}
-                                    className="input min-h-[120px] resize-none"
-                                    placeholder="Short summary of the project goals..."
-                                />
-                            </div>
-                            <div className="flex gap-4 pt-4">
-                                <button
-                                    type="button"
-                                    onClick={() => setIsModalOpen(false)}
-                                    className="btn btn-muted flex-1 text-slate-400 hover:text-white"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    type="submit"
-                                    disabled={isCreating || !newProject.name.trim()}
-                                    className="btn btn-primary btn-lg flex-1 font-black text-lg"
-                                >
-                                    {isCreating ? <Loader2 className="w-5 h-5 animate-spin" /> : "Create Project"}
-                                </button>
-                            </div>
                         </form>
                     </div>
                 </div>
             )}
 
-            {/* Edit Project Modal */}
-            {editingProject && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-6 pb-20 lg:p-10">
-                    <div className="absolute inset-0 bg-black/60 backdrop-blur-md" onClick={() => setEditingProject(null)} />
-                    <div className="relative w-full max-w-xl card shadow-2xl animate-in fade-in zoom-in-95 duration-200 overflow-hidden">
-                        <div className="card-header flex items-center justify-between">
-                            <h2 className="heading-3">Edit Project</h2>
-                            <button onClick={() => setEditingProject(null)} className="p-2 hover:bg-white/5 rounded-lg transition-colors">
-                                <Plus className="w-6 h-6 rotate-45 text-muted-foreground" />
-                            </button>
-                        </div>
-                        <form onSubmit={handleUpdateProject} className="card-content stack-lg">
-                            <div className="stack-sm">
-                                <label className="caption text-muted-foreground ml-1">Project Name</label>
-                                <input
-                                    type="text"
-                                    required
-                                    value={editingProject.name}
-                                    onChange={(e) => setEditingProject({ ...editingProject, name: e.target.value })}
-                                    className="input"
-                                />
-                            </div>
-                            <div className="stack-sm">
-                                <label className="caption text-muted-foreground ml-1">Client Name</label>
-                                <input
-                                    type="text"
-                                    value={editingProject.clientName || ""}
-                                    onChange={(e) => setEditingProject({ ...editingProject, clientName: e.target.value })}
-                                    className="input"
-                                />
-                            </div>
-                            <div className="stack-sm">
-                                <label className="caption text-muted-foreground ml-1">Description</label>
-                                <textarea
-                                    value={editingProject.description || ""}
-                                    onChange={(e) => setEditingProject({ ...editingProject, description: e.target.value })}
-                                    className="input min-h-[120px] resize-none"
-                                />
-                            </div>
-                            <div className="flex gap-4 pt-4">
-                                <button
-                                    type="button"
-                                    onClick={() => setEditingProject(null)}
-                                    className="btn btn-muted flex-1 text-slate-400 hover:text-white"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    type="submit"
-                                    className="btn btn-primary btn-lg flex-1 font-black text-lg"
-                                >
-                                    Save Changes
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            )}
             {/* Extension Setup Modal */}
             {isExtensionModalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-                    <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={() => setIsExtensionModalOpen(false)} />
-                    <div className="relative w-full max-w-xl bg-[#0f0f13] border border-white/10 rounded-[32px] overflow-hidden shadow-2xl">
-                        <div className="p-8 lg:p-10">
-                            <div className="flex items-center gap-4 mb-8">
-                                <div className="w-12 h-12 rounded-2xl bg-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-500/20">
-                                    <Chrome className="w-6 h-6 text-white" />
-                                </div>
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
+                    <div className="absolute inset-0 bg-black/90 backdrop-blur-xl" onClick={() => setIsExtensionModalOpen(false)} />
+                    <div className="relative w-full max-w-2xl bg-[#0f0f13] border border-white/5 rounded-[40px] overflow-hidden shadow-2xl">
+                        <div className="p-10">
+                            <div className="flex items-center gap-6 mb-10">
+                                <div className="w-16 h-16 rounded-[24px] bg-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-500/20"><Chrome className="w-8 h-8 text-white" /></div>
                                 <div>
-                                    <h3 className="text-2xl font-black text-white">Browser Assistant</h3>
-                                    <p className="text-slate-400 font-medium">Capture feedback directly from Gmail or Slack</p>
+                                    <h3 className="text-3xl font-black text-white">Browser Force.</h3>
+                                    <p className="text-slate-500 font-medium">Deploy the extension to 10x your speed.</p>
                                 </div>
                             </div>
-
-                            <div className="space-y-6">
-                                <div className="flex gap-4 group">
-                                    <div className="w-8 h-8 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-xs font-black text-indigo-400 group-hover:bg-indigo-500/10 transition-colors">1</div>
-                                    <div>
-                                        <p className="font-bold text-white mb-1">Download & Unzip</p>
-                                        <p className="text-sm text-slate-500">Download the ZIP kit below and extract it to a folder on your computer.</p>
-                                        <a href="/enforcer-extension.zip" download className="inline-flex items-center gap-2 mt-3 text-xs font-black text-indigo-400 hover:text-indigo-300 transition-colors">
-                                            <Download className="w-3 h-3" /> CLICK HERE TO DOWNLOAD
-                                        </a>
-                                    </div>
+                            <div className="grid grid-cols-2 gap-6 mb-10">
+                                <div className="p-6 bg-white/5 rounded-3xl border border-white/5">
+                                    <span className="text-2xl font-black text-indigo-500 mb-2 block">01</span>
+                                    <p className="text-sm font-bold text-white mb-2">Download Kit</p>
+                                    <p className="text-xs text-slate-500 leading-relaxed mb-4">Get the secure ZIP bundle with one click.</p>
+                                    <a href="/enforcer-extension.zip" download className="inline-flex items-center gap-2 text-[10px] font-black text-indigo-400 hover:text-white transition-colors"><Download className="w-3 h-3" /> CLICK TO DOWNLOAD</a>
                                 </div>
-
-                                <div className="flex gap-4 group">
-                                    <div className="w-8 h-8 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-xs font-black text-indigo-400">2</div>
-                                    <div>
-                                        <p className="font-bold text-white mb-1">Open Extensions Page</p>
-                                        <p className="text-sm text-slate-500">Copy <code className="bg-white/5 px-2 py-0.5 rounded text-indigo-300">chrome://extensions</code> into your browser address bar.</p>
-                                    </div>
+                                <div className="p-6 bg-white/5 rounded-3xl border border-white/5">
+                                    <span className="text-2xl font-black text-indigo-500 mb-2 block">02</span>
+                                    <p className="text-sm font-bold text-white mb-2">Active Dev Mode</p>
+                                    <p className="text-xs text-slate-500 leading-relaxed">Visit <code className="text-indigo-300">chrome://extensions</code> and toggle Developer Mode.</p>
                                 </div>
-
-                                <div className="flex gap-4 group">
-                                    <div className="w-8 h-8 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-xs font-black text-indigo-400">3</div>
-                                    <div>
-                                        <p className="font-bold text-white mb-1">Turn on Developer Mode</p>
-                                        <p className="text-sm text-slate-500">Enable the <span className="text-slate-300 font-bold">"Developer mode"</span> toggle in the top right corner.</p>
-                                    </div>
+                                <div className="p-6 bg-white/5 rounded-3xl border border-white/5">
+                                    <span className="text-2xl font-black text-indigo-500 mb-2 block">03</span>
+                                    <p className="text-sm font-bold text-white mb-2">Load Library</p>
+                                    <p className="text-xs text-slate-500 leading-relaxed">Click "Load unpacked" and select your extracted folder.</p>
                                 </div>
-
-                                <div className="flex gap-4 group">
-                                    <div className="w-8 h-8 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-xs font-black text-indigo-400">4</div>
-                                    <div>
-                                        <p className="font-bold text-white mb-1">Load Unpacked</p>
-                                        <p className="text-sm text-slate-500">Click <span className="text-slate-300 font-bold">"Load unpacked"</span> and select the folder you unzipped in Step 1.</p>
-                                    </div>
+                                <div className="p-6 bg-indigo-600/10 rounded-3xl border border-indigo-600/20">
+                                    <span className="text-2xl font-black text-emerald-500 mb-2 block">04</span>
+                                    <p className="text-sm font-bold text-white mb-2">Ready to Enforce</p>
+                                    <p className="text-xs text-slate-400 leading-relaxed">Right-click any text in Gmail and hit <span className="text-white font-bold">"Enforce Feedback"</span>.</p>
                                 </div>
                             </div>
-
-                            <div className="mt-10 pt-8 border-t border-white/5 flex flex-col items-center">
-                                <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-500/10 border border-emerald-500/20 mb-6 font-bold text-emerald-400 text-xs tracking-wide">
-                                    <Sparkles className="w-3 h-3" /> DESIGNER TIP
-                                </div>
-                                <p className="text-center text-sm text-slate-400 max-w-sm leading-relaxed mb-8">
-                                    Highlight any text in Gmail or Slack, <span className="text-white font-bold">Right-Click</span> and select <span className="text-indigo-400 font-bold">"Enforce this Feedback"</span> to capture it instantly!
-                                </p>
-                                <button
-                                    onClick={() => setIsExtensionModalOpen(false)}
-                                    className="w-full h-14 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl text-white font-black transition-all"
-                                >
-                                    GOT IT!
-                                </button>
-                            </div>
+                            <button onClick={() => setIsExtensionModalOpen(false)} className="w-full h-16 bg-white/5 hover:bg-white/10 text-white font-black rounded-2xl transition-all border border-white/5">I'LL DO THIS NOW</button>
                         </div>
                     </div>
                 </div>

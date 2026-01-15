@@ -7,9 +7,15 @@ interface AIAnalysisResult {
     summary: string;
     patterns: string[];
     confidenceScore: number;
+    conflicts?: {
+        roundNumber: number;
+        originalRequest: string;
+        currentRequest: string;
+        explanation: string;
+    }[];
 }
 
-export async function analyzeFeedback(rawText: string): Promise<AIAnalysisResult | null> {
+export async function analyzeFeedback(rawText: string, history?: string): Promise<AIAnalysisResult | null> {
     const apiKey = process.env.GROQ_API_KEY;
     if (!apiKey) {
         console.error("Missing GROQ_API_KEY");
@@ -19,8 +25,16 @@ export async function analyzeFeedback(rawText: string): Promise<AIAnalysisResult
     const prompt = `
     You are an expert Project Manager AI. Your job is to parse raw, messy client feedback into structured data.
     
-    Here is the raw feedback:
+    Current Feedback to analyze:
     "${rawText}"
+
+    ${history ? `
+    PROJECT HISTORY (Last 3 Rounds):
+    "${history}"
+    
+    IMPORTANT: Carefully compare the Current Feedback against the Project History. 
+    If you detect that the client is asking for something they previously rejected, or if they are reverting a change they specifically asked for in a previous round, identify this as a "conflict".
+    ` : ''}
 
     Please analyze this and return a JSON object with the following structure:
     {
@@ -29,11 +43,19 @@ export async function analyzeFeedback(rawText: string): Promise<AIAnalysisResult
       "sentiment": "One of: positive, neutral, negative, urgent",
       "tone": "A short adjective describing the tone (e.g., Constructive, Frustrated, Confused)",
       "summary": "A 1-sentence summary of the main point.",
-      "patterns": ["Identify any recurring themes or potential long-term issues (e.g., 'Client frequently mentions font size', 'Consistent confusion about navigation'). If none, return empty array."],
-      "confidenceScore": 0 // 0-100 integer representing how clear and actionable the feedback is. Low score means the feedback is vague or contradictory.
+      "patterns": ["Identify any recurring themes (e.g., 'Client frequently mentions font size')."],
+      "confidenceScore": 0,
+      "conflicts": [ // ONLY if history is provided and a circular loop is detected
+        {
+          "roundNumber": 0,
+          "originalRequest": "What they said before",
+          "currentRequest": "What they are saying now",
+          "explanation": "Why this is a circular loop or conflict"
+        }
+      ]
     }
 
-    Return ONLY the JSON. Do not include markdown formatting like \`\`\`json.
+    Return ONLY the JSON.
   `;
 
     try {
@@ -44,12 +66,12 @@ export async function analyzeFeedback(rawText: string): Promise<AIAnalysisResult
                 "Content-Type": "application/json",
             },
             body: JSON.stringify({
-                model: "llama-3.3-70b-versatile", // Current production model
+                model: "llama-3.3-70b-versatile",
                 messages: [
-                    { role: "system", content: "You are a helpful AI assistant that parses client feedback into JSON." },
+                    { role: "system", content: "You are a helpful AI assistant that parses client feedback into JSON. Be extremely vigilant about circular loops and contradicting feedback." },
                     { role: "user", content: prompt }
                 ],
-                temperature: 0.1, // Low temperature for consistent formatting
+                temperature: 0.1,
             }),
         });
 
