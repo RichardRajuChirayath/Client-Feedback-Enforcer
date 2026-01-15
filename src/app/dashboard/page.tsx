@@ -164,7 +164,13 @@ export default function DashboardPage() {
     };
 
     const handleSaveRevision = async () => {
-        if (!analysisResult || !selectedProjectId) return;
+        if (!analysisResult) return;
+
+        if (!selectedProjectId) {
+            alert("No project selected! Please create a project first to save this revision.");
+            setIsModalOpen(true);
+            return;
+        }
 
         setIsSavingRevision(true);
         try {
@@ -180,8 +186,14 @@ export default function DashboardPage() {
             });
             if (res.ok) {
                 router.push(`/projects/${selectedProjectId}`);
+            } else {
+                const error = await res.json();
+                alert(error.error || "Failed to save revision");
             }
-        } catch (e) { console.error(e); }
+        } catch (e) {
+            console.error(e);
+            alert("An unexpected error occurred while saving.");
+        }
         finally { setIsSavingRevision(false); }
     };
 
@@ -462,24 +474,38 @@ export default function DashboardPage() {
                                                     <h4 className="body-lg font-black text-white">Save to Project</h4>
                                                     <p className="body-sm text-muted-foreground">Convert this analysis into a new revision round.</p>
                                                 </div>
-                                                <div className="flex items-center gap-4 w-full md:w-auto">
-                                                    <select
-                                                        value={selectedProjectId}
-                                                        onChange={(e) => setSelectedProjectId(e.target.value)}
-                                                        className="input py-3 text-sm min-w-[200px]"
-                                                    >
-                                                        {projects.map(p => (
-                                                            <option key={p.id} value={p.id}>{p.name}</option>
-                                                        ))}
-                                                    </select>
-                                                    <button
-                                                        onClick={handleSaveRevision}
-                                                        disabled={isSavingRevision || !selectedProjectId}
-                                                        className="btn btn-primary whitespace-nowrap"
-                                                    >
-                                                        {isSavingRevision ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Save className="w-4 h-4" /> Save Revision</>}
-                                                    </button>
-                                                </div>
+                                                {projects.length > 0 ? (
+                                                    <div className="flex items-center gap-4 w-full md:w-auto">
+                                                        <select
+                                                            value={selectedProjectId}
+                                                            onChange={(e) => setSelectedProjectId(e.target.value)}
+                                                            className="input py-3 text-sm min-w-[200px]"
+                                                        >
+                                                            {projects.map(p => (
+                                                                <option key={p.id} value={p.id}>{p.name}</option>
+                                                            ))}
+                                                        </select>
+                                                        <button
+                                                            onClick={handleSaveRevision}
+                                                            disabled={isSavingRevision}
+                                                            className="btn btn-primary whitespace-nowrap"
+                                                        >
+                                                            {isSavingRevision ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Save className="w-4 h-4" /> Save Revision</>}
+                                                        </button>
+                                                    </div>
+                                                ) : (
+                                                    <div className="flex flex-col items-center md:items-end gap-3 w-full md:w-auto">
+                                                        <p className="text-sm font-bold text-amber-400 bg-amber-400/10 px-4 py-2 rounded-lg border border-amber-400/20">
+                                                            No projects found. Create one to save this revision.
+                                                        </p>
+                                                        <button
+                                                            onClick={() => setIsModalOpen(true)}
+                                                            className="btn btn-primary w-full md:w-auto"
+                                                        >
+                                                            <Plus className="w-4 h-4" /> Create Project
+                                                        </button>
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
                                     </div>
