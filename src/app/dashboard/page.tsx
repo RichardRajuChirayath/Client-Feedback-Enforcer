@@ -209,8 +209,17 @@ export default function DashboardPage() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ url: inspirationUrl }),
             });
-            if (res.ok) setLabResult(await res.json());
-        } catch (e) { console.error(e); }
+            if (res.ok) {
+                setLabResult(await res.json());
+            } else {
+                const error = await res.json();
+                alert(`Failed to analyze: ${error.error || 'Unknown error'}`);
+                console.error("API Error:", error);
+            }
+        } catch (e: any) {
+            console.error(e);
+            alert(`Network error: ${e.message}`);
+        }
         finally { setIsInhaling(false); }
     };
 
