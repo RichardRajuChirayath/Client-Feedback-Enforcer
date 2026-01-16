@@ -135,7 +135,10 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                         </div>
                     </div>
                     <div className="flex items-center gap-4">
-                        <button className="btn btn-primary">
+                        <button
+                            onClick={() => router.push(`/dashboard?projectId=${project.id}`)}
+                            className="btn btn-primary"
+                        >
                             <Plus className="w-5 h-5" />
                             Add Revision
                         </button>

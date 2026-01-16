@@ -1,13 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
     Loader2, LogOut, FolderPlus, Sparkles, CheckCircle2,
     MessageCircleQuestion, Send, Folder, ChevronRight,
-    Zap, LayoutDashboard, Settings, Plus, Clock, MoreVertical,
+    Zap, Settings, Plus, Clock, MoreVertical,
     Trash2, Edit2, Save, Search, ArrowUpDown, BarChart3, Layers, Download,
-    Chrome, Globe, Wand2, Lightbulb, AlertTriangle
+    Chrome, AlertTriangle
 } from "lucide-react";
 
 interface User {
@@ -42,6 +42,7 @@ interface AnalysisResult {
 }
 
 export default function DashboardPage() {
+    const searchParams = useSearchParams();
     const router = useRouter();
     const [user, setUser] = useState<User | null>(null);
     const [projects, setProjects] = useState<Project[]>([]);
@@ -57,7 +58,6 @@ export default function DashboardPage() {
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isExtensionModalOpen, setIsExtensionModalOpen] = useState(false);
-    const [activeTab, setActiveTab] = useState<"parser" | "lab">("parser");
 
     // Project States
     const [newProject, setNewProject] = useState({ name: "", clientName: "", description: "" });
@@ -69,11 +69,6 @@ export default function DashboardPage() {
     const [selectedProjectId, setSelectedProjectId] = useState<string>("");
     const [isSavingRevision, setIsSavingRevision] = useState(false);
 
-    // Inspiration Lab States
-    const [inspirationUrl, setInspirationUrl] = useState("");
-    const [isInhaling, setIsInhaling] = useState(false);
-    const [labResult, setLabResult] = useState<any>(null);
-
     useEffect(() => {
         setIsMounted(true);
     }, []);
@@ -83,7 +78,16 @@ export default function DashboardPage() {
         if (projRes.ok) {
             const data = await projRes.json();
             setProjects(data);
-            if (data.length > 0 && !selectedProjectId) setSelectedProjectId(data[0].id);
+
+            // Check URL via searchParams or just fallback to state
+            const urlProjectId = searchParams.get("projectId");
+
+            if (urlProjectId) {
+                const exists = data.find((p: Project) => p.id === urlProjectId);
+                if (exists) setSelectedProjectId(urlProjectId);
+            } else if (data.length > 0 && !selectedProjectId) {
+                setSelectedProjectId(data[0].id);
+            }
         }
     };
 
@@ -99,7 +103,7 @@ export default function DashboardPage() {
             finally { setIsLoading(false); }
         };
         init();
-    }, [router]);
+    }, [router, searchParams]); // Added searchParams dependency
 
     const handleLogout = async () => {
         await fetch("/api/auth/logout", { method: "POST" });
@@ -199,30 +203,6 @@ export default function DashboardPage() {
         finally { setIsSavingRevision(false); }
     };
 
-    const handleAnalyzeInspiration = async () => {
-        if (!inspirationUrl.trim()) return;
-        setIsInhaling(true);
-        setLabResult(null);
-        try {
-            const res = await fetch("/api/analyze-inspiration", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ url: inspirationUrl }),
-            });
-            if (res.ok) {
-                setLabResult(await res.json());
-            } else {
-                const error = await res.json();
-                alert(`Failed to analyze: ${error.error || 'Unknown error'}`);
-                console.error("API Error:", error);
-            }
-        } catch (e: any) {
-            console.error(e);
-            alert(`Network error: ${e.message}`);
-        }
-        finally { setIsInhaling(false); }
-    };
-
     const totalProjects = projects.length;
     const totalRevisions = projects.reduce((acc, curr) => acc + curr._count.revisions, 0);
 
@@ -254,18 +234,6 @@ export default function DashboardPage() {
                     </div>
                 </div>
                 <div className="flex-1 overflow-y-auto p-4 space-y-8">
-                    <div className="space-y-2">
-                        <span className="px-2 text-[10px] font-black text-slate-600 uppercase tracking-widest pl-3">Platform</span>
-                        <div className="space-y-1">
-                            <button onClick={() => setActiveTab("parser")} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'parser' ? 'bg-indigo-600/10 text-indigo-400' : 'text-slate-500 hover:text-white hover:bg-white/5'}`}>
-                                <LayoutDashboard className="w-4 h-4" /> Feedback Parser
-                            </button>
-                            <button onClick={() => setActiveTab("lab")} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'lab' ? 'bg-indigo-600/10 text-indigo-400' : 'text-slate-500 hover:text-white hover:bg-white/5'}`}>
-                                <Wand2 className="w-4 h-4" /> Inspiration Lab
-                            </button>
-                        </div>
-                    </div>
-
                     <div className="space-y-4">
                         <div className="flex items-center justify-between px-3">
                             <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest">Projects</span>
@@ -302,8 +270,8 @@ export default function DashboardPage() {
                     {/* Header */}
                     <div className="flex items-end justify-between border-b border-white/5 pb-10">
                         <div>
-                            <h1 className="text-4xl lg:text-5xl font-black text-white tracking-tight">{activeTab === 'parser' ? 'FEEDBACK DNA' : 'INSPIRATION LAB'}</h1>
-                            <p className="text-slate-500 mt-2 font-medium">{activeTab === 'parser' ? 'Paste client feedback to extract technical items' : 'Analyze competitor designs for strategic insights'}</p>
+                            <h1 className="text-4xl lg:text-5xl font-black text-white tracking-tight">FEEDBACK DNA</h1>
+                            <p className="text-slate-500 mt-2 font-medium">Paste client feedback to extract technical items</p>
                         </div>
                         <div className="flex gap-4">
                             <div className="hidden lg:flex flex-col items-end">
@@ -316,164 +284,100 @@ export default function DashboardPage() {
                     <div className="grid grid-cols-12 gap-12">
                         {/* Tool Column */}
                         <div className="col-span-12 lg:col-span-7 space-y-8">
-                            {activeTab === 'parser' ? (
-                                <div className="space-y-6">
-                                    <div className="bg-[#0f0f13] border border-white/5 rounded-[32px] p-8 shadow-2xl relative overflow-hidden group">
-                                        <div className="absolute top-0 right-0 p-4 opacity-50"><Sparkles className="w-12 h-12 text-indigo-500/20" /></div>
-                                        <textarea
-                                            value={feedbackInput}
-                                            onChange={(e) => setFeedbackInput(e.target.value)}
-                                            placeholder="Paste the 'Client Talk' here..."
-                                            className="w-full h-80 bg-transparent border-none text-xl text-white placeholder:text-slate-700 focus:ring-0 resize-none font-medium leading-relaxed"
-                                        />
-                                        <button
-                                            onClick={handleAnalyze}
-                                            disabled={isAnalyzing || !feedbackInput.trim()}
-                                            className="w-full h-16 bg-white text-black font-black text-lg rounded-2xl flex items-center justify-center gap-3 hover:bg-slate-200 transition-all disabled:opacity-50"
-                                        >
-                                            {isAnalyzing ? <Loader2 className="w-6 h-6 animate-spin" /> : <><Zap className="w-6 h-6 fill-black" /> EXTRACT SIGNALS</>}
-                                        </button>
-                                    </div>
-
-                                    {analysisResult && (
-                                        <div className="bg-[#0f0f13] border border-emerald-500/10 rounded-[32px] p-8 shadow-2xl animate-in fade-in slide-in-from-top-4">
-                                            <div className="flex items-center justify-between mb-8">
-                                                <div className="flex items-center gap-3">
-                                                    <div className="px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-black uppercase rounded-full">Analysis Complete</div>
-                                                    <span className="text-sm font-bold text-slate-500">Confidence: {analysisResult.confidenceScore}%</span>
-                                                </div>
-                                                <div className="flex gap-2">
-                                                    <span className="px-3 py-1 bg-white/5 text-slate-400 text-[10px] font-black uppercase rounded-full">{analysisResult.sentiment}</span>
-                                                    <span className="px-3 py-1 bg-white/5 text-slate-400 text-[10px] font-black uppercase rounded-full">{analysisResult.tone}</span>
-                                                </div>
-                                            </div>
-
-                                            <h2 className="text-2xl font-black text-white mb-8">{analysisResult.summary}</h2>
-
-                                            {analysisResult.conflicts && analysisResult.conflicts.length > 0 && (
-                                                <div className="mb-10 p-6 bg-red-500/10 border-2 border-red-500/20 rounded-3xl space-y-4 animate-in shake duration-500">
-                                                    <div className="flex items-center gap-3 text-red-400">
-                                                        <AlertTriangle className="w-6 h-6" />
-                                                        <h4 className="text-[10px] font-black uppercase tracking-[0.2em]">CIRCULAR LOOP DETECTED</h4>
-                                                    </div>
-                                                    <div className="space-y-4">
-                                                        {analysisResult.conflicts.map((conflict, i) => (
-                                                            <div key={i} className="p-4 bg-black/40 rounded-2xl border border-red-500/10 space-y-3">
-                                                                <div className="flex justify-between items-start gap-4">
-                                                                    <div className="space-y-1">
-                                                                        <span className="text-[9px] font-black text-slate-500 uppercase">Original Round {conflict.roundNumber}</span>
-                                                                        <p className="text-xs text-slate-300 italic">"{conflict.originalRequest}"</p>
-                                                                    </div>
-                                                                    <div className="space-y-1 text-right">
-                                                                        <span className="text-[9px] font-black text-red-400 uppercase">New Contradiction</span>
-                                                                        <p className="text-xs text-white font-bold">"{conflict.currentRequest}"</p>
-                                                                    </div>
-                                                                </div>
-                                                                <p className="text-[11px] text-red-300 font-medium pt-2 border-t border-red-500/10">
-                                                                    <span className="font-black">DEFENSE STRATEGY:</span> {conflict.explanation}
-                                                                </p>
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                            )}
-
-                                            <div className="grid grid-cols-2 gap-8 mb-10">
-                                                <div>
-                                                    <h4 className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mb-4 flex items-center gap-2">
-                                                        <CheckCircle2 className="w-4 h-4" /> Action Items
-                                                    </h4>
-                                                    <ul className="space-y-3">
-                                                        {analysisResult.tasks.map((t, i) => <li key={i} className="text-sm text-slate-400 leading-relaxed border-l-2 border-emerald-500/30 pl-4">{t}</li>)}
-                                                    </ul>
-                                                </div>
-                                                <div>
-                                                    <h4 className="text-[10px] font-black text-amber-500 uppercase tracking-widest mb-4 flex items-center gap-2">
-                                                        <MessageCircleQuestion className="w-4 h-4" /> Critical Gaps
-                                                    </h4>
-                                                    <ul className="space-y-3">
-                                                        {analysisResult.questions.map((q, i) => <li key={i} className="text-sm text-slate-400 leading-relaxed italic border-l-2 border-amber-500/30 pl-4">{q}</li>)}
-                                                    </ul>
-                                                </div>
-                                            </div>
-
-                                            <div className="p-6 bg-white/5 rounded-2xl border border-white/5 flex items-center justify-between gap-6">
-                                                <div className="flex-1">
-                                                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Save to Round</p>
-                                                    <select value={selectedProjectId} onChange={(e) => setSelectedProjectId(e.target.value)} className="w-full bg-transparent border-none text-white font-bold p-0 focus:ring-0">
-                                                        {projects.map(p => <option key={p.id} value={p.id} className="bg-[#0f0f13]">{p.name}</option>)}
-                                                    </select>
-                                                </div>
-                                                <button onClick={handleSaveRevision} disabled={isSavingRevision} className="h-12 px-8 bg-indigo-600 hover:bg-indigo-500 text-white font-black rounded-xl transition-all">
-                                                    {isSavingRevision ? <Loader2 className="w-4 h-4 animate-spin" /> : "COMMIT REVISION"}
-                                                </button>
-                                            </div>
-                                        </div>
-                                    )}
+                            <div className="space-y-6">
+                                <div className="bg-[#0f0f13] border border-white/5 rounded-[32px] p-8 shadow-2xl relative overflow-hidden group">
+                                    <div className="absolute top-0 right-0 p-4 opacity-50"><Sparkles className="w-12 h-12 text-indigo-500/20" /></div>
+                                    <textarea
+                                        value={feedbackInput}
+                                        onChange={(e) => setFeedbackInput(e.target.value)}
+                                        placeholder="Paste the 'Client Talk' here..."
+                                        className="w-full h-80 bg-transparent border-none text-xl text-white placeholder:text-slate-700 focus:ring-0 resize-none font-medium leading-relaxed"
+                                    />
+                                    <button
+                                        onClick={handleAnalyze}
+                                        disabled={isAnalyzing || !feedbackInput.trim()}
+                                        className="w-full h-16 bg-white text-black font-black text-lg rounded-2xl flex items-center justify-center gap-3 hover:bg-slate-200 transition-all disabled:opacity-50"
+                                    >
+                                        {isAnalyzing ? <Loader2 className="w-6 h-6 animate-spin" /> : <><Zap className="w-6 h-6 fill-black" /> EXTRACT SIGNALS</>}
+                                    </button>
                                 </div>
-                            ) : (
-                                <div className="space-y-8">
-                                    <div className="bg-[#0f0f13] border border-white/5 rounded-[32px] p-8 space-y-6">
-                                        <p className="text-slate-500 font-medium">Drop a URL below. I'll deconstruct the design DNA and give you a strategy.</p>
-                                        <div className="flex gap-3">
-                                            <input
-                                                type="url"
-                                                value={inspirationUrl}
-                                                onChange={(e) => setInspirationUrl(e.target.value)}
-                                                placeholder="https://stripe.com"
-                                                className="w-full h-14 bg-white/5 border border-white/5 rounded-xl px-6 text-white font-medium focus:ring-2 focus:ring-indigo-600 transition-all outline-none"
-                                            />
-                                            <button onClick={handleAnalyzeInspiration} disabled={isInhaling || !inspirationUrl.trim()} className="h-14 px-8 bg-white text-black font-black rounded-xl hover:bg-slate-200 transition-all">
-                                                {isInhaling ? <Loader2 className="w-5 h-5 animate-spin" /> : "INHALA DNA"}
-                                            </button>
+
+                                {analysisResult && (
+                                    <div className="bg-[#0f0f13] border border-emerald-500/10 rounded-[32px] p-8 shadow-2xl animate-in fade-in slide-in-from-top-4">
+                                        <div className="flex items-center justify-between mb-8">
+                                            <div className="flex items-center gap-3">
+                                                <div className="px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-black uppercase rounded-full">Analysis Complete</div>
+                                                <span className="text-sm font-bold text-slate-500">Confidence: {analysisResult.confidenceScore}%</span>
+                                            </div>
+                                            <div className="flex gap-2">
+                                                <span className="px-3 py-1 bg-white/5 text-slate-400 text-[10px] font-black uppercase rounded-full">{analysisResult.sentiment}</span>
+                                                <span className="px-3 py-1 bg-white/5 text-slate-400 text-[10px] font-black uppercase rounded-full">{analysisResult.tone}</span>
+                                            </div>
                                         </div>
-                                    </div>
 
-                                    {labResult && (
-                                        <div className="bg-[#0f0f13] border border-indigo-500/20 rounded-[32px] p-10 space-y-10 animate-in slide-in-from-bottom-8 duration-500">
-                                            <div className="flex items-center gap-6 pb-8 border-b border-white/5">
-                                                <div className="w-16 h-16 rounded-[24px] bg-indigo-600/10 flex items-center justify-center border border-indigo-500/20"><Globe className="w-8 h-8 text-indigo-400" /></div>
-                                                <div>
-                                                    <h3 className="text-3xl font-black text-white">{labResult.title}</h3>
-                                                    <p className="text-indigo-400 font-black uppercase tracking-[0.3em] text-sm">{labResult.vibe}</p>
-                                                </div>
-                                            </div>
+                                        <h2 className="text-2xl font-black text-white mb-8">{analysisResult.summary}</h2>
 
-                                            <div className="grid grid-cols-2 gap-10">
-                                                <div className="space-y-4">
-                                                    <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">DESIGN PRINCIPLES</span>
-                                                    <div className="flex flex-wrap gap-2">
-                                                        {labResult.designPrinciples.map((p: any) => <span key={p} className="px-3 py-1.5 bg-white/5 border border-white/10 rounded-lg text-xs font-bold text-slate-300">{p}</span>)}
-                                                    </div>
+                                        {analysisResult.conflicts && analysisResult.conflicts.length > 0 && (
+                                            <div className="mb-10 p-6 bg-red-500/10 border-2 border-red-500/20 rounded-3xl space-y-4 animate-in shake duration-500">
+                                                <div className="flex items-center gap-3 text-red-400">
+                                                    <AlertTriangle className="w-6 h-6" />
+                                                    <h4 className="text-[10px] font-black uppercase tracking-[0.2em]">CIRCULAR LOOP DETECTED</h4>
                                                 </div>
                                                 <div className="space-y-4">
-                                                    <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">DOMINANT PALETTE</span>
-                                                    <div className="flex gap-2">
-                                                        {labResult.colorPalette.map((c: any) => <div key={c} className="w-10 h-10 rounded-xl border border-white/10 shadow-lg" style={{ backgroundColor: c }} title={c} />)}
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            <div className="p-8 bg-indigo-600/5 rounded-3xl border border-indigo-600/10">
-                                                <h4 className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-4 flex items-center gap-2"><Sparkles className="w-4 h-4" /> CORE STRATEGY</h4>
-                                                <p className="text-lg text-slate-300 font-medium leading-relaxed italic">{labResult.uxStrategy}</p>
-                                            </div>
-
-                                            <div className="space-y-6">
-                                                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">IMMEDIATE ACTIONS</span>
-                                                <div className="grid gap-4">
-                                                    {labResult.advice.map((a: any, i: number) => (
-                                                        <div key={i} className="flex items-center gap-4 bg-white/5 p-4 rounded-2xl border border-white/5">
-                                                            <div className="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-xs font-black text-white shrink-0">{i + 1}</div>
-                                                            <p className="text-sm text-slate-300 font-bold">{a}</p>
+                                                    {analysisResult.conflicts.map((conflict, i) => (
+                                                        <div key={i} className="p-4 bg-black/40 rounded-2xl border border-red-500/10 space-y-3">
+                                                            <div className="flex justify-between items-start gap-4">
+                                                                <div className="space-y-1">
+                                                                    <span className="text-[9px] font-black text-slate-500 uppercase">Original Round {conflict.roundNumber}</span>
+                                                                    <p className="text-xs text-slate-300 italic">"{conflict.originalRequest}"</p>
+                                                                </div>
+                                                                <div className="space-y-1 text-right">
+                                                                    <span className="text-[9px] font-black text-red-400 uppercase">New Contradiction</span>
+                                                                    <p className="text-xs text-white font-bold">"{conflict.currentRequest}"</p>
+                                                                </div>
+                                                            </div>
+                                                            <p className="text-[11px] text-red-300 font-medium pt-2 border-t border-red-500/10">
+                                                                <span className="font-black">DEFENSE STRATEGY:</span> {conflict.explanation}
+                                                            </p>
                                                         </div>
                                                     ))}
                                                 </div>
                                             </div>
+                                        )}
+
+                                        <div className="grid grid-cols-2 gap-8 mb-10">
+                                            <div>
+                                                <h4 className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mb-4 flex items-center gap-2">
+                                                    <CheckCircle2 className="w-4 h-4" /> Action Items
+                                                </h4>
+                                                <ul className="space-y-3">
+                                                    {analysisResult.tasks.map((t, i) => <li key={i} className="text-sm text-slate-400 leading-relaxed border-l-2 border-emerald-500/30 pl-4">{t}</li>)}
+                                                </ul>
+                                            </div>
+                                            <div>
+                                                <h4 className="text-[10px] font-black text-amber-500 uppercase tracking-widest mb-4 flex items-center gap-2">
+                                                    <MessageCircleQuestion className="w-4 h-4" /> Critical Gaps
+                                                </h4>
+                                                <ul className="space-y-3">
+                                                    {analysisResult.questions.map((q, i) => <li key={i} className="text-sm text-slate-400 leading-relaxed italic border-l-2 border-amber-500/30 pl-4">{q}</li>)}
+                                                </ul>
+                                            </div>
                                         </div>
-                                    )}
-                                </div>
-                            )}
+
+                                        <div className="p-6 bg-white/5 rounded-2xl border border-white/5 flex items-center justify-between gap-6">
+                                            <div className="flex-1">
+                                                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Save to Round</p>
+                                                <select value={selectedProjectId} onChange={(e) => setSelectedProjectId(e.target.value)} className="w-full bg-transparent border-none text-white font-bold p-0 focus:ring-0">
+                                                    {projects.map(p => <option key={p.id} value={p.id} className="bg-[#0f0f13]">{p.name}</option>)}
+                                                </select>
+                                            </div>
+                                            <button onClick={handleSaveRevision} disabled={isSavingRevision} className="h-12 px-8 bg-indigo-600 hover:bg-indigo-500 text-white font-black rounded-xl transition-all">
+                                                {isSavingRevision ? <Loader2 className="w-4 h-4 animate-spin" /> : "COMMIT REVISION"}
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
                         </div>
 
                         {/* Recent Projects Column */}
