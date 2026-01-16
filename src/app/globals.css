@@ -17,6 +17,10 @@
   --color-input: rgb(var(--input));
   --color-ring: rgb(var(--ring));
 
+  --font-sans: var(--font-inter);
+  --font-display: var(--font-space);
+  --font-mono: var(--font-mono);
+
   --radius-sm: 0.5rem;
   --radius-md: 0.75rem;
   --radius-lg: 1rem;
@@ -25,9 +29,9 @@
 
 :root {
   /* Color System (RGB values for opacity support) */
-  --background: 9 9 11;
+  --background: 5 5 5;
   --foreground: 250 250 250;
-  --card: 15 15 17;
+  --card: 10 10 12;
   --card-foreground: 250 250 250;
   --primary: 99 102 241;
   --primary-foreground: 255 255 255;
@@ -37,8 +41,8 @@
   --muted-foreground: 161 161 170;
   --accent: 39 39 42;
   --accent-foreground: 250 250 250;
-  --border: 39 39 42;
-  --input: 39 39 42;
+  --border: 50 50 60;
+  --input: 20 20 25;
   --ring: 99 102 241;
 
   /* Type Scale */
@@ -78,7 +82,7 @@
     background-color: var(--color-background);
     color: var(--color-foreground);
     font-feature-settings: "rlig" 1, "calt" 1;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-family: var(--font-sans), system-ui, sans-serif;
   }
 }
 
@@ -86,29 +90,35 @@
 
   /* Typography Components */
   .heading-1 {
+    font-family: var(--font-display);
     font-size: var(--text-4xl);
     font-weight: 700;
     line-height: var(--leading-tight);
-    letter-spacing: -0.02em;
+    letter-spacing: -0.04em;
   }
 
   .heading-2 {
+    font-family: var(--font-display);
     font-size: var(--text-3xl);
     font-weight: 700;
     line-height: var(--leading-tight);
-    letter-spacing: -0.01em;
+    letter-spacing: -0.03em;
   }
 
   .heading-3 {
+    font-family: var(--font-display);
     font-size: var(--text-2xl);
     font-weight: 600;
     line-height: var(--leading-snug);
+    letter-spacing: -0.02em;
   }
 
   .heading-4 {
+    font-family: var(--font-display);
     font-size: var(--text-xl);
     font-weight: 600;
     line-height: var(--leading-snug);
+    letter-spacing: -0.01em;
   }
 
   .body-lg {
@@ -127,11 +137,12 @@
   }
 
   .caption {
+    font-family: var(--font-mono);
     font-size: var(--text-xs);
     line-height: var(--leading-normal);
     font-weight: 500;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
+    letter-spacing: 0.08em;
   }
 
   /* Card Components */
@@ -139,6 +150,7 @@
     background: var(--color-card);
     border: 1px solid var(--color-border);
     border-radius: var(--radius-xl);
+    box-shadow: 0 0 0 1px rgb(255 255 255 / 0.03), 0 4px 20px -8px rgb(0 0 0 / 0.5);
   }
 
   .card-header {
@@ -161,18 +173,20 @@
     font-weight: 600;
     padding: var(--space-3) var(--space-5);
     border-radius: var(--radius-md);
-    transition: all 150ms ease;
+    transition: all 200ms cubic-bezier(0.16, 1, 0.3, 1);
   }
 
   .btn-primary {
-    background: var(--color-primary);
+    background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
     color: var(--color-primary-foreground);
+    border: 1px solid rgb(255 255 255 / 0.1);
+    box-shadow: 0 0 0 1px rgb(99 102 241 / 0.5), 0 4px 12px rgb(79 70 229 / 0.4), inset 0 1px 0 rgb(255 255 255 / 0.2);
   }
 
   .btn-primary:hover:not(:disabled) {
-    opacity: 0.9;
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgb(var(--primary) / 0.3);
+    transform: translateY(-1px) scale(1.02);
+    box-shadow: 0 0 0 1px rgb(99 102 241 / 0.6), 0 8px 16px rgb(79 70 229 / 0.5), inset 0 1px 0 rgb(255 255 255 / 0.3);
+    filter: brightness(1.1);
   }
 
   .btn-lg {
